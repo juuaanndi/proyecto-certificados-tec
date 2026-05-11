@@ -1,0 +1,8 @@
+-- =====================================================
+-- Sprint 2 - Módulo 2: Sesiones y Actividad
+-- Archivo: 01_tablas.sql
+-- Responsable: Sebastián Méndez Montero
+-- Dependencias:
+--   - PERIODO_AIR
+--   - NOMBRAMIENTO
+-- =====================================================
