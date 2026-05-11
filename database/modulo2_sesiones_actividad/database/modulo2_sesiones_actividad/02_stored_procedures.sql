@@ -1,9 +1,0 @@
--- =====================================================
--- Sprint 2 - Módulo 2: Sesiones y Actividad
--- Archivo: 02_stored_procedures.sql
--- Responsable: Sebastián Méndez Montero
--- Dependencias:
---   - SESION
---   - ASISTENCIA
---   - COMISION_TRABAJO
--- =====================================================
