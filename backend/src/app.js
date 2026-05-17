@@ -18,6 +18,7 @@ const pdfRoutes = require('./routes/pdfRoutes');
 const asistenciaRoutes = require('./routes/asistenciaRoutes');
 const nombramientoRoutes = require('./routes/nombramientoRoutes');
 const resolucionRoutes = require('./routes/resolucionRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use('/api/pdf', verificarToken, pdfRoutes);
 app.use('/api/asistencias', verificarToken, asistenciaRoutes);
 app.use('/api/nombramientos', verificarToken, nombramientoRoutes);
 app.use('/api/resoluciones', verificarToken, resolucionRoutes);
+app.use('/api/auth', authRoutes);
 
 app.use(errorHandler);
 module.exports = app;
