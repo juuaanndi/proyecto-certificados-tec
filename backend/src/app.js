@@ -14,6 +14,10 @@ const propuestaRoutes = require('./routes/propuestaRoutes');
 const agendaRoutes = require('./routes/agendaRoutes');
 const comisionRoutes = require('./routes/comisionRoutes');
 const actaRoutes = require('./routes/actaRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
+const asistenciaRoutes = require('./routes/asistenciaRoutes');
+const nombramientoRoutes = require('./routes/nombramientoRoutes');
+const resolucionRoutes = require('./routes/resolucionRoutes');
 
 const app = express();
 
@@ -34,6 +38,10 @@ app.use('/api/propuestas', verificarToken, propuestaRoutes);
 app.use('/api/agendas', verificarToken, agendaRoutes);
 app.use('/api/comisiones', verificarToken, comisionRoutes);
 app.use('/api/actas', verificarToken, actaRoutes);
+app.use('/api/pdf', verificarToken, pdfRoutes);
+app.use('/api/asistencias', verificarToken, asistenciaRoutes);
+app.use('/api/nombramientos', verificarToken, nombramientoRoutes);
+app.use('/api/resoluciones', verificarToken, resolucionRoutes);
 
 app.use(errorHandler);
 module.exports = app;
