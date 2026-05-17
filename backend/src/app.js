@@ -1,6 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+require('./config/firebase');
+
+const { verificarToken } = require('./middlewares/authMiddleware');
 
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const asambleistaRoutes = require('./routes/asambleistaRoutes');
@@ -16,19 +19,19 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Rutas
-app.use('/api/usuarios', usuarioRoutes);
-app.use('/api/asambleistas', asambleistaRoutes);
-app.use('/api/sesiones', sesionRoutes);
-app.use('/api/certificaciones', certificacionRoutes);
-app.use('/api/propuestas', propuestaRoutes);
-app.use('/api/agendas', agendaRoutes);
-app.use('/api/comisiones', comisionRoutes);
-app.use('/api/actas', actaRoutes);
-
-// Ruta de prueba
+// Ruta de prueba (pública)
 app.get('/', (req, res) => {
   res.json({ message: 'API AIR TEC funcionando ✅' });
 });
+
+// Rutas protegidas
+app.use('/api/usuarios', verificarToken, usuarioRoutes);
+app.use('/api/asambleistas', verificarToken, asambleistaRoutes);
+app.use('/api/sesiones', verificarToken, sesionRoutes);
+app.use('/api/certificaciones', verificarToken, certificacionRoutes);
+app.use('/api/propuestas', verificarToken, propuestaRoutes);
+app.use('/api/agendas', verificarToken, agendaRoutes);
+app.use('/api/comisiones', verificarToken, comisionRoutes);
+app.use('/api/actas', verificarToken, actaRoutes);
 
 module.exports = app;
