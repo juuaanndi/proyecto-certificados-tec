@@ -4,6 +4,7 @@ require('dotenv').config();
 require('./config/firebase');
 
 const { verificarToken } = require('./middlewares/authMiddleware');
+const { errorHandler } = require('./middlewares/errorMiddleware');
 
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const asambleistaRoutes = require('./routes/asambleistaRoutes');
@@ -34,4 +35,5 @@ app.use('/api/agendas', verificarToken, agendaRoutes);
 app.use('/api/comisiones', verificarToken, comisionRoutes);
 app.use('/api/actas', verificarToken, actaRoutes);
 
+app.use(errorHandler);
 module.exports = app;
