@@ -86,3 +86,7 @@ CREATE TABLE AUDITORIA (
     fecha_hora TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
     CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario) REFERENCES USUARIO(id_usuario)
 );
+
+-- Actualización de roles según rúbrica
+-- (ejecutar solo si los roles anteriores fueron creados con nombres distintos)
+-- Roles: ADMINISTRADOR, SECRETARIA, ASAMBLEISTA
