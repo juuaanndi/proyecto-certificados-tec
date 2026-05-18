@@ -1,101 +1,172 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
   MenuItem,
-  Modal,
   Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 
+import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+
+import api from "../controllers/api";
+
+const TIPOS_PROPUESTA = [
+  { value: "BASE", label: "Base" },
+  { value: "CONCILIADA", label: "Conciliada" },
+];
+
+const ES_BASE_OPCIONES = [
+  { value: 1, label: "Sí" },
+  { value: 0, label: "No" },
+];
+
+const FORM_INICIAL = {
+  id_periodo: 1,
+  codigo_air: "",
+  titulo: "",
+  tipo: "BASE",
+  es_base: 1,
+  id_propuesta_padre: "",
+};
+
 function Propuestas() {
+  const [propuestas, setPropuestas] = useState([]);
   const [open, setOpen] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [idEditando, setIdEditando] = useState(null);
 
-  const [propuestas, setPropuestas] = useState([
-    {
-      id: 1,
-      codigo: "PROP-001-2026",
-      titulo: "Actualización Reglamento Interno",
-      proponente: "Ana Rodríguez",
-      tipo: "Reforma",
-      etapa: "Procedencia",
-      fecha: "2026-05-15",
-      estado: "En revisión",
-    },
-    {
-      id: 2,
-      codigo: "PROP-002-2026",
-      titulo: "Nueva Comisión Académica",
-      proponente: "Carlos Méndez",
-      tipo: "Creación",
-      etapa: "Aprobación",
-      fecha: "2026-05-16",
-      estado: "Aprobada",
-    },
-  ]);
+  const [cargando, setCargando] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
-  const [form, setForm] = useState({
-    titulo: "",
-    proponente: "",
-    tipo: "",
-    etapa: "",
-    fecha: "",
-    estado: "Pendiente",
-  });
+  const [mensajeError, setMensajeError] = useState("");
+  const [mensajeExito, setMensajeExito] = useState("");
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+  const [form, setForm] = useState(FORM_INICIAL);
+
+  useEffect(() => {
+    cargarPropuestas();
+  }, []);
+
+  useEffect(() => {
+    if (Number(form.es_base) === 1) {
+      setForm((prev) => ({
+        ...prev,
+        id_propuesta_padre: "",
+      }));
+    }
+  }, [form.es_base]);
+
+  const propuestasOrdenadas = useMemo(() => {
+    return [...propuestas].sort(
+      (a, b) => Number(b.ID_PROPUESTA) - Number(a.ID_PROPUESTA)
+    );
+  }, [propuestas]);
+
+  const cargarPropuestas = async () => {
+    try {
+      setCargando(true);
+      setMensajeError("");
+
+      const response = await api.get("/propuestas");
+
+      setPropuestas(response.data || []);
+    } catch (error) {
+      console.error("Error cargando propuestas:", error);
+
+      const detalle =
+        error?.response?.data?.detalle ||
+        error?.response?.data?.error ||
+        "No se pudieron cargar las propuestas.";
+
+      setMensajeError(detalle);
+    } finally {
+      setCargando(false);
+    }
   };
 
-  const generarCodigo = () => {
-    const fechaSeleccionada = form.fecha ? new Date(form.fecha) : new Date();
-    const anio = fechaSeleccionada.getFullYear();
+  const generarCodigoPropuesta = () => {
+    const anio = new Date().getFullYear();
 
-    const propuestasDelAnio = propuestas.filter((propuesta) =>
-      propuesta.codigo.endsWith(`-${anio}`)
-    );
+    const propuestasDelAnio = propuestas
+      .map((propuesta) => propuesta.CODIGO_AIR)
+      .filter(Boolean)
+      .filter((codigo) => codigo.endsWith(`-${anio}`))
+      .map((codigo) => {
+        const partes = codigo.split("-");
+        return Number(partes[1]);
+      })
+      .filter((numero) => !Number.isNaN(numero));
 
-    const siguiente = propuestasDelAnio.length + 1;
+    const siguiente =
+      propuestasDelAnio.length > 0
+        ? Math.max(...propuestasDelAnio) + 1
+        : 1;
 
     return `PROP-${String(siguiente).padStart(3, "0")}-${anio}`;
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
   const abrirCrear = () => {
+    setMensajeError("");
+    setMensajeExito("");
+
     setModoEdicion(false);
     setIdEditando(null);
+
     setForm({
-      titulo: "",
-      proponente: "",
-      tipo: "",
-      etapa: "",
-      fecha: "",
-      estado: "Pendiente",
+      ...FORM_INICIAL,
+      codigo_air: generarCodigoPropuesta(),
     });
+
     setOpen(true);
   };
 
   const abrirEditar = (propuesta) => {
+    setMensajeError("");
+    setMensajeExito("");
+
     setModoEdicion(true);
-    setIdEditando(propuesta.id);
+    setIdEditando(propuesta.ID_PROPUESTA);
+
     setForm({
-      titulo: propuesta.titulo,
-      proponente: propuesta.proponente,
-      tipo: propuesta.tipo,
-      etapa: propuesta.etapa,
-      fecha: propuesta.fecha,
-      estado: propuesta.estado,
+      id_periodo: propuesta.ID_PERIODO || 1,
+      codigo_air: propuesta.CODIGO_AIR || "",
+      titulo: propuesta.TITULO || "",
+      tipo: propuesta.TIPO || "BASE",
+      es_base: Number(propuesta.ES_BASE),
+      id_propuesta_padre:
+        propuesta.ID_PROPUESTA_PADRE || "",
     });
+
     setOpen(true);
   };
 
@@ -103,225 +174,519 @@ function Propuestas() {
     setOpen(false);
     setModoEdicion(false);
     setIdEditando(null);
-    setForm({
-      titulo: "",
-      proponente: "",
-      tipo: "",
-      etapa: "",
-      fecha: "",
-      estado: "Pendiente",
-    });
+    setForm(FORM_INICIAL);
   };
 
-  const guardarPropuesta = () => {
+  const guardarPropuesta = async () => {
     if (
+      !form.codigo_air ||
       !form.titulo ||
-      !form.proponente ||
-      !form.tipo ||
-      !form.etapa ||
-      !form.fecha ||
-      !form.estado
+      !form.tipo
     ) {
-      alert("Complete todos los campos antes de guardar.");
+      setMensajeError(
+        "Complete todos los campos obligatorios."
+      );
       return;
     }
 
-    if (modoEdicion) {
-      const propuestasActualizadas = propuestas.map((propuesta) =>
-        propuesta.id === idEditando
-          ? {
-              ...propuesta,
-              titulo: form.titulo,
-              proponente: form.proponente,
-              tipo: form.tipo,
-              etapa: form.etapa,
-              fecha: form.fecha,
-              estado: form.estado,
-            }
-          : propuesta
+    const datos = {
+      id_periodo: Number(form.id_periodo),
+      codigo_air: form.codigo_air,
+      titulo: form.titulo,
+      tipo: form.tipo,
+      es_base: Number(form.es_base),
+      id_propuesta_padre:
+        form.id_propuesta_padre === ""
+          ? null
+          : Number(form.id_propuesta_padre),
+    };
+
+    try {
+      setGuardando(true);
+      setMensajeError("");
+      setMensajeExito("");
+
+      if (modoEdicion) {
+        await api.put(
+          `/propuestas/${idEditando}`,
+          datos
+        );
+
+        setMensajeExito(
+          "Propuesta actualizada correctamente."
+        );
+      } else {
+        await api.post("/propuestas", datos);
+
+        setMensajeExito(
+          "Propuesta creada correctamente."
+        );
+      }
+
+      cerrarModal();
+      await cargarPropuestas();
+    } catch (error) {
+      console.error(
+        "Error guardando propuesta:",
+        error
       );
 
-      setPropuestas(propuestasActualizadas);
-    } else {
-      const nuevaPropuesta = {
-        id: propuestas.length + 1,
-        codigo: generarCodigo(),
-        ...form,
-      };
+      const detalle =
+        error?.response?.data?.detalle ||
+        error?.response?.data?.error ||
+        "No se pudo guardar la propuesta.";
 
-      setPropuestas([...propuestas, nuevaPropuesta]);
+      setMensajeError(detalle);
+    } finally {
+      setGuardando(false);
     }
+  };
 
-    cerrarModal();
+  const eliminarPropuestaVista = async (
+    idPropuesta
+  ) => {
+    const confirmar = window.confirm(
+      "¿Seguro que desea eliminar esta propuesta?"
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setMensajeError("");
+      setMensajeExito("");
+
+      await api.delete(
+        `/propuestas/${idPropuesta}`
+      );
+
+      await cargarPropuestas();
+
+      setMensajeExito(
+        "Propuesta eliminada correctamente."
+      );
+    } catch (error) {
+      console.error(
+        "Error eliminando propuesta:",
+        error
+      );
+
+      const detalle =
+        error?.response?.data?.detalle ||
+        error?.response?.data?.error ||
+        "No se pudo eliminar la propuesta.";
+
+      setMensajeError(detalle);
+    }
   };
 
   return (
-    <Box>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Gestión de Propuestas
-      </Typography>
+    <Box
+      sx={{
+        width: "100%",
+        maxWidth: 1180,
+        mx: "auto",
+        px: { xs: 2, md: 4 },
+        py: 4,
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 4 },
+          borderRadius: 4,
+          background:
+            "linear-gradient(135deg, rgba(25,118,210,0.08), rgba(255,255,255,1))",
+          border:
+            "1px solid rgba(25,118,210,0.12)",
+          mb: 3,
+        }}
+      >
+        <Stack
+          direction={{
+            xs: "column",
+            md: "row",
+          }}
+          justifyContent="space-between"
+          spacing={2}
+        >
+          <Box>
+            <Typography
+              variant="h4"
+              fontWeight={800}
+              gutterBottom
+            >
+              Gestión de Propuestas
+            </Typography>
 
-      <Button variant="contained" onClick={abrirCrear} sx={{ mb: 3 }}>
-        Nueva propuesta
-      </Button>
+            <Typography color="text.secondary">
+              Administre propuestas reales
+              registradas en Oracle.
+            </Typography>
+          </Box>
 
-      <Paper elevation={2}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell><strong>Código</strong></TableCell>
-              <TableCell><strong>Título</strong></TableCell>
-              <TableCell><strong>Proponente</strong></TableCell>
-              <TableCell><strong>Tipo</strong></TableCell>
-              <TableCell><strong>Etapa</strong></TableCell>
-              <TableCell><strong>Fecha</strong></TableCell>
-              <TableCell><strong>Estado</strong></TableCell>
-              <TableCell><strong>Acciones</strong></TableCell>
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {propuestas.map((propuesta) => (
-              <TableRow key={propuesta.id}>
-                <TableCell>{propuesta.codigo}</TableCell>
-                <TableCell>{propuesta.titulo}</TableCell>
-                <TableCell>{propuesta.proponente}</TableCell>
-                <TableCell>{propuesta.tipo}</TableCell>
-                <TableCell>{propuesta.etapa}</TableCell>
-                <TableCell>{propuesta.fecha}</TableCell>
-                <TableCell>{propuesta.estado}</TableCell>
-                <TableCell>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => abrirEditar(propuesta)}
-                  >
-                    Editar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={abrirCrear}
+            sx={{
+              height: 46,
+              px: 3,
+              borderRadius: 2,
+              fontWeight: 700,
+              alignSelf: {
+                xs: "stretch",
+                md: "center",
+              },
+            }}
+          >
+            Nueva propuesta
+          </Button>
+        </Stack>
       </Paper>
 
-      <Modal open={open} onClose={cerrarModal}>
-        <Box sx={modalStyle}>
-          <Typography variant="h5" fontWeight="bold" gutterBottom>
-            {modoEdicion ? "Editar propuesta" : "Nueva propuesta"}
-          </Typography>
+      {mensajeError && (
+        <Alert
+          severity="error"
+          sx={{
+            mb: 2,
+            borderRadius: 2,
+          }}
+        >
+          {mensajeError}
+        </Alert>
+      )}
 
-          <TextField
-            fullWidth
-            label="Código"
-            value={
-              modoEdicion
-                ? propuestas.find((p) => p.id === idEditando)?.codigo || ""
-                : generarCodigo()
-            }
-            margin="normal"
-            disabled
-          />
+      {mensajeExito && (
+        <Alert
+          severity="success"
+          sx={{
+            mb: 2,
+            borderRadius: 2,
+          }}
+        >
+          {mensajeExito}
+        </Alert>
+      )}
 
-          <TextField
-            fullWidth
-            label="Título de la propuesta"
-            name="titulo"
-            value={form.titulo}
-            onChange={handleChange}
-            margin="normal"
-          />
-
-          <TextField
-            fullWidth
-            label="Proponente"
-            name="proponente"
-            value={form.proponente}
-            onChange={handleChange}
-            margin="normal"
-          />
-
-          <TextField
-            select
-            fullWidth
-            label="Tipo de propuesta"
-            name="tipo"
-            value={form.tipo}
-            onChange={handleChange}
-            margin="normal"
+      <Paper
+        elevation={2}
+        sx={{
+          borderRadius: 4,
+          overflow: "hidden",
+          border:
+            "1px solid rgba(0,0,0,0.06)",
+        }}
+      >
+        <Box sx={{ p: 2.5 }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            spacing={2}
           >
-            <MenuItem value="Reforma">Reforma</MenuItem>
-            <MenuItem value="Creación">Creación</MenuItem>
-            <MenuItem value="Derogación">Derogación</MenuItem>
-            <MenuItem value="Modificación">Modificación</MenuItem>
-          </TextField>
+            <Box>
+              <Typography
+                variant="h6"
+                fontWeight={800}
+              >
+                Propuestas registradas
+              </Typography>
 
-          <TextField
-            select
-            fullWidth
-            label="Etapa"
-            name="etapa"
-            value={form.etapa}
-            onChange={handleChange}
-            margin="normal"
-          >
-            <MenuItem value="Procedencia">Procedencia</MenuItem>
-            <MenuItem value="Aprobación">Aprobación</MenuItem>
-            <MenuItem value="Dictamen">Dictamen</MenuItem>
-            <MenuItem value="Comisión">Comisión</MenuItem>
-          </TextField>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Total: {propuestas.length}
+              </Typography>
+            </Box>
 
-          <TextField
-            fullWidth
-            type="date"
-            label="Fecha"
-            name="fecha"
-            value={form.fecha}
-            onChange={handleChange}
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
-
-          <TextField
-            select
-            fullWidth
-            label="Estado"
-            name="estado"
-            value={form.estado}
-            onChange={handleChange}
-            margin="normal"
-          >
-            <MenuItem value="Pendiente">Pendiente</MenuItem>
-            <MenuItem value="En revisión">En revisión</MenuItem>
-            <MenuItem value="Aprobada">Aprobada</MenuItem>
-            <MenuItem value="Rechazada">Rechazada</MenuItem>
-          </TextField>
-
-          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-            <Button variant="outlined" onClick={cerrarModal}>
-              Cancelar
-            </Button>
-
-            <Button variant="contained" onClick={guardarPropuesta}>
-              Guardar
-            </Button>
-          </Box>
+            {cargando && (
+              <CircularProgress size={26} />
+            )}
+          </Stack>
         </Box>
-      </Modal>
+
+        <Divider />
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow
+                sx={{
+                  backgroundColor:
+                    "rgba(25,118,210,0.06)",
+                }}
+              >
+                <TableCell sx={{ fontWeight: 800 }}>
+                  Código AIR
+                </TableCell>
+
+                <TableCell sx={{ fontWeight: 800 }}>
+                  Título
+                </TableCell>
+
+                <TableCell sx={{ fontWeight: 800 }}>
+                  Tipo
+                </TableCell>
+
+                <TableCell sx={{ fontWeight: 800 }}>
+                  Es base
+                </TableCell>
+
+                <TableCell sx={{ fontWeight: 800 }}>
+                  Propuesta padre
+                </TableCell>
+
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 800 }}
+                >
+                  Acciones
+                </TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {propuestasOrdenadas.map(
+                (propuesta) => (
+                  <TableRow
+                    key={propuesta.ID_PROPUESTA}
+                    hover
+                  >
+                    <TableCell>
+                      {propuesta.CODIGO_AIR}
+                    </TableCell>
+
+                    <TableCell>
+                      {propuesta.TITULO}
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={propuesta.TIPO}
+                        size="small"
+                        color={
+                          propuesta.TIPO ===
+                          "BASE"
+                            ? "primary"
+                            : "secondary"
+                        }
+                        variant="outlined"
+                      />
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={
+                          Number(
+                            propuesta.ES_BASE
+                          ) === 1
+                            ? "Sí"
+                            : "No"
+                        }
+                        size="small"
+                        color={
+                          Number(
+                            propuesta.ES_BASE
+                          ) === 1
+                            ? "success"
+                            : "default"
+                        }
+                      />
+                    </TableCell>
+
+                    <TableCell>
+                      {propuesta.ID_PROPUESTA_PADRE ||
+                        "Sin propuesta padre"}
+                    </TableCell>
+
+                    <TableCell align="right">
+                      <Stack
+                        direction="row"
+                        justifyContent="flex-end"
+                        spacing={1}
+                      >
+                        <Tooltip title="Editar propuesta">
+                          <IconButton
+                            color="primary"
+                            onClick={() =>
+                              abrirEditar(
+                                propuesta
+                              )
+                            }
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+
+                        <Tooltip title="Eliminar propuesta">
+                          <IconButton
+                            color="error"
+                            onClick={() =>
+                              eliminarPropuestaVista(
+                                propuesta.ID_PROPUESTA
+                              )
+                            }
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                )
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Dialog
+        open={open}
+        onClose={cerrarModal}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          <Typography
+            variant="h5"
+            fontWeight={800}
+          >
+            {modoEdicion
+              ? "Editar propuesta"
+              : "Nueva propuesta"}
+          </Typography>
+        </DialogTitle>
+
+        <DialogContent>
+          <Stack
+            spacing={2.5}
+            sx={{ mt: 1 }}
+          >
+            <TextField
+              label="Código AIR"
+              name="codigo_air"
+              value={form.codigo_air}
+              onChange={handleChange}
+              fullWidth
+            />
+
+            <TextField
+              label="Título de la propuesta"
+              name="titulo"
+              value={form.titulo}
+              onChange={handleChange}
+              fullWidth
+            />
+
+            <TextField
+              select
+              label="Tipo de propuesta"
+              name="tipo"
+              value={form.tipo}
+              onChange={handleChange}
+              fullWidth
+            >
+              {TIPOS_PROPUESTA.map((tipo) => (
+                <MenuItem
+                  key={tipo.value}
+                  value={tipo.value}
+                >
+                  {tipo.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="¿Es propuesta base?"
+              name="es_base"
+              value={form.es_base}
+              onChange={handleChange}
+              fullWidth
+            >
+              {ES_BASE_OPCIONES.map(
+                (opcion) => (
+                  <MenuItem
+                    key={opcion.value}
+                    value={opcion.value}
+                  >
+                    {opcion.label}
+                  </MenuItem>
+                )
+              )}
+            </TextField>
+
+            <TextField
+              select
+              label="Propuesta padre"
+              name="id_propuesta_padre"
+              value={form.id_propuesta_padre}
+              onChange={handleChange}
+              fullWidth
+              disabled={
+                Number(form.es_base) === 1
+              }
+              helperText={
+                Number(form.es_base) === 1
+                  ? "Las propuestas base no pueden tener propuesta padre."
+                  : "Seleccione una propuesta padre o deje vacío."
+              }
+            >
+              <MenuItem value="">
+                Sin propuesta padre
+              </MenuItem>
+
+              {propuestasOrdenadas
+                .filter(
+                  (propuesta) =>
+                    propuesta.ID_PROPUESTA !==
+                    idEditando
+                )
+                .map((propuesta) => (
+                  <MenuItem
+                    key={
+                      propuesta.ID_PROPUESTA
+                    }
+                    value={
+                      propuesta.ID_PROPUESTA
+                    }
+                  >
+                    {propuesta.CODIGO_AIR} -{" "}
+                    {propuesta.TITULO}
+                  </MenuItem>
+                ))}
+            </TextField>
+          </Stack>
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 3,
+          }}
+        >
+          <Button
+            onClick={cerrarModal}
+            disabled={guardando}
+          >
+            Cancelar
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={guardarPropuesta}
+            disabled={guardando}
+          >
+            {guardando
+              ? "Guardando..."
+              : modoEdicion
+              ? "Actualizar propuesta"
+              : "Guardar propuesta"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
-
-const modalStyle = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: 560,
-  bgcolor: "background.paper",
-  borderRadius: 3,
-  boxShadow: 24,
-  p: 4,
-};
 
 export default Propuestas;
