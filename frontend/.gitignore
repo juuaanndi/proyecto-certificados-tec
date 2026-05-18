@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Archivos sensibles
+*.zip
+wallet
+wallet.zip
+.env
+.env.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

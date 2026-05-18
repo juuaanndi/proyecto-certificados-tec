@@ -1,4 +1,42 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../controllers/firebase";
+
 function Login() {
+  const navigate = useNavigate();
+
+  const [correo, setCorreo] = useState("");
+  const [contrasena, setContrasena] = useState("");
+  const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false);
+
+  const iniciarSesion = async (e) => {
+    e.preventDefault();
+    setError("");
+    setCargando(true);
+
+    try {
+      const credencial = await signInWithEmailAndPassword(
+        auth,
+        correo,
+        contrasena
+      );
+
+      const token = await credencial.user.getIdToken();
+
+      localStorage.setItem("firebaseToken", token);
+      localStorage.setItem("userEmail", credencial.user.email);
+
+      navigate("/dashboard");
+    } catch (err) {
+        console.log("Error Firebase:", err.code, err.message);
+      setError("Correo o contraseña incorrectos.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -9,7 +47,8 @@ function Login() {
         backgroundColor: "#f4f6f9",
       }}
     >
-      <div
+      <form
+        onSubmit={iniciarSesion}
         style={{
           backgroundColor: "white",
           padding: "40px",
@@ -20,12 +59,14 @@ function Login() {
         }}
       >
         <h1>AIR TEC</h1>
-
         <p>Sistema de Certificaciones</p>
 
         <input
-          type="text"
+          type="email"
           placeholder="Correo institucional"
+          value={correo}
+          onChange={(e) => setCorreo(e.target.value)}
+          required
           style={{
             width: "100%",
             padding: "10px",
@@ -38,6 +79,9 @@ function Login() {
         <input
           type="password"
           placeholder="Contraseña"
+          value={contrasena}
+          onChange={(e) => setContrasena(e.target.value)}
+          required
           style={{
             width: "100%",
             padding: "10px",
@@ -47,22 +91,30 @@ function Login() {
           }}
         />
 
+        {error && (
+          <p style={{ color: "red", fontSize: "14px", marginTop: "12px" }}>
+            {error}
+          </p>
+        )}
+
         <button
+          type="submit"
+          disabled={cargando}
           style={{
             width: "100%",
             padding: "12px",
             marginTop: "20px",
-            backgroundColor: "#0066ff",
+            backgroundColor: cargando ? "#999" : "#0066ff",
             color: "white",
             border: "none",
             borderRadius: "8px",
-            cursor: "pointer",
+            cursor: cargando ? "not-allowed" : "pointer",
             fontWeight: "bold",
           }}
         >
-          Iniciar sesión
+          {cargando ? "Ingresando..." : "Iniciar sesión"}
         </button>
-      </div>
+      </form>
     </div>
   );
 }
