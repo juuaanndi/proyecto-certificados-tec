@@ -1,315 +1,555 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
   MenuItem,
-  Modal,
   Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+
+import api from "../controllers/api";
+
+const catalogosIniciales = {
+  asambleistas: [],
+  periodos: [],
+  sectores: [],
+  condiciones: ["TITULAR", "SUPLENTE"],
+  estados: ["VIGENTE", "FINALIZADO", "RENUNCIA"],
+};
+
+const formInicial = {
+  id_asambleista: "",
+  id_periodo: 1,
+  id_sector: "",
+  puesto: "",
+  condicion: "TITULAR",
+  inicio: "",
+  fin: "",
+  estado: "VIGENTE",
+  num_resolucion: "",
+};
+
+function normalizarFecha(fecha) {
+  if (!fecha) return "";
+
+  try {
+    return new Date(fecha).toISOString().split("T")[0];
+  } catch {
+    return fecha;
+  }
+}
+
 function Nombramientos() {
+  const [nombramientos, setNombramientos] = useState([]);
+  const [catalogos, setCatalogos] = useState(catalogosIniciales);
+
+  const [form, setForm] = useState(formInicial);
+
   const [open, setOpen] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
-  const [idEditando, setIdEditando] = useState(null);
+  const [idActual, setIdActual] = useState(null);
 
-  const [nombramientos, setNombramientos] = useState([
-    {
-      id: 1,
-      asambleista: "Ana Rodríguez",
-      sector: "Docente",
-      puesto: "Presidenta",
-      fechaInicio: "2026-01-01",
-      fechaFin: "2026-12-31",
-      estado: "Activo",
-    },
-    {
-      id: 2,
-      asambleista: "Carlos Méndez",
-      sector: "Administrativo",
-      puesto: "Secretario",
-      fechaInicio: "2026-02-01",
-      fechaFin: "2026-11-30",
-      estado: "Pendiente",
-    },
-  ]);
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
 
-  const [form, setForm] = useState({
-    asambleista: "",
-    sector: "",
-    puesto: "",
-    fechaInicio: "",
-    fechaFin: "",
-    estado: "Pendiente",
-  });
+  const [mensajeError, setMensajeError] = useState("");
+  const [mensajeExito, setMensajeExito] = useState("");
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
+  useEffect(() => {
+    cargarTodo();
+  }, []);
 
-  const abrirCrear = () => {
+  async function cargarTodo() {
+    try {
+      setCargando(true);
+
+      await Promise.all([
+        cargarNombramientos(),
+        cargarCatalogos(),
+      ]);
+    } catch (error) {
+      console.error(error);
+      setMensajeError("Error cargando información.");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function cargarNombramientos() {
+    try {
+      const response = await api.get("/nombramientos");
+      setNombramientos(response.data || []);
+    } catch (error) {
+      console.error(error);
+      setMensajeError("Error cargando nombramientos.");
+    }
+  }
+
+  async function cargarCatalogos() {
+    try {
+      const response = await api.get("/nombramientos/catalogos");
+
+      setCatalogos({
+        asambleistas: response.data.asambleistas || [],
+        periodos: response.data.periodos || [],
+        sectores: response.data.sectores || [],
+        condiciones: ["TITULAR", "SUPLENTE"],
+        estados: ["VIGENTE", "FINALIZADO", "RENUNCIA"],
+      });
+    } catch (error) {
+      console.error(error);
+      setMensajeError("Error cargando catálogos.");
+    }
+  }
+
+  function abrirCrear() {
     setModoEdicion(false);
-    setIdEditando(null);
-    setForm({
-      asambleista: "",
-      sector: "",
-      puesto: "",
-      fechaInicio: "",
-      fechaFin: "",
-      estado: "Pendiente",
-    });
+    setIdActual(null);
+    setForm(formInicial);
     setOpen(true);
-  };
+  }
 
-  const abrirEditar = (nombramiento) => {
+  function abrirEditar(nombramiento) {
     setModoEdicion(true);
-    setIdEditando(nombramiento.id);
+
+    setIdActual(nombramiento.ID_NOMBRAMIENTO);
+
     setForm({
-      asambleista: nombramiento.asambleista,
-      sector: nombramiento.sector,
-      puesto: nombramiento.puesto,
-      fechaInicio: nombramiento.fechaInicio,
-      fechaFin: nombramiento.fechaFin,
-      estado: nombramiento.estado,
+      id_asambleista: nombramiento.ID_ASAMBLEISTA,
+      id_periodo: nombramiento.ID_PERIODO,
+      id_sector: nombramiento.ID_SECTOR,
+      puesto: nombramiento.PUESTO || "",
+      condicion: nombramiento.CONDICION || "TITULAR",
+      inicio: normalizarFecha(nombramiento.INICIO),
+      fin: normalizarFecha(nombramiento.FIN),
+      estado: nombramiento.ESTADO || "VIGENTE",
+      num_resolucion: nombramiento.NUM_RESOLUCION || "",
     });
+
     setOpen(true);
-  };
+  }
 
-  const cerrarModal = () => {
+  function cerrarModal() {
     setOpen(false);
-    setModoEdicion(false);
-    setIdEditando(null);
-    setForm({
-      asambleista: "",
-      sector: "",
-      puesto: "",
-      fechaInicio: "",
-      fechaFin: "",
-      estado: "Pendiente",
-    });
-  };
+    setForm(formInicial);
+    setIdActual(null);
+  }
 
-  const validarFechas = () => {
-    if (!form.fechaInicio || !form.fechaFin) return false;
+  function handleChange(e) {
+    const { name, value } = e.target;
 
-    const inicio = new Date(form.fechaInicio);
-    const fin = new Date(form.fechaFin);
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
 
-    return fin >= inicio;
-  };
+  function construirPayload() {
+    return {
+      id_asambleista: Number(form.id_asambleista),
+      id_periodo: Number(form.id_periodo),
+      id_sector: Number(form.id_sector),
+      puesto: form.puesto.trim(),
+      condicion: form.condicion,
+      inicio: form.inicio,
+      fin: form.fin || null,
+      estado: form.estado,
+      num_resolucion: form.num_resolucion.trim() || null,
+    };
+  }
 
-  const guardarNombramiento = () => {
-    if (
-      !form.asambleista ||
-      !form.sector ||
-      !form.puesto ||
-      !form.fechaInicio ||
-      !form.fechaFin ||
-      !form.estado
-    ) {
-      alert("Complete todos los campos antes de guardar.");
-      return;
-    }
+  async function guardarNombramiento() {
+    try {
+      setGuardando(true);
+      setMensajeError("");
+      setMensajeExito("");
 
-    if (!validarFechas()) {
-      alert("La fecha final no puede ser menor que la fecha de inicio.");
-      return;
-    }
+      const payload = construirPayload();
 
-    if (modoEdicion) {
-      const nombramientosActualizados = nombramientos.map((nombramiento) =>
-        nombramiento.id === idEditando
-          ? {
-              ...nombramiento,
-              asambleista: form.asambleista,
-              sector: form.sector,
-              puesto: form.puesto,
-              fechaInicio: form.fechaInicio,
-              fechaFin: form.fechaFin,
-              estado: form.estado,
-            }
-          : nombramiento
+      if (modoEdicion) {
+        await api.put(`/nombramientos/${idActual}`, payload);
+
+        setMensajeExito("Nombramiento actualizado correctamente.");
+      } else {
+        await api.post("/nombramientos", payload);
+
+        setMensajeExito("Nombramiento creado correctamente.");
+      }
+
+      cerrarModal();
+      cargarNombramientos();
+    } catch (error) {
+      console.error(error);
+
+      setMensajeError(
+        error?.response?.data?.detalle ||
+          "Error guardando nombramiento."
       );
-
-      setNombramientos(nombramientosActualizados);
-    } else {
-      const nuevoNombramiento = {
-        id: nombramientos.length + 1,
-        ...form,
-      };
-
-      setNombramientos([...nombramientos, nuevoNombramiento]);
+    } finally {
+      setGuardando(false);
     }
+  }
 
-    cerrarModal();
-  };
+  async function eliminarNombramientoVista(id) {
+    try {
+      await api.delete(`/nombramientos/${id}`);
+
+      setMensajeExito("Nombramiento eliminado correctamente.");
+
+      cargarNombramientos();
+    } catch (error) {
+      console.error(error);
+
+      setMensajeError(
+        error?.response?.data?.detalle ||
+          "Error eliminando nombramiento."
+      );
+    }
+  }
+
+  const nombramientosOrdenados = useMemo(() => {
+    return [...nombramientos].sort(
+      (a, b) => b.ID_NOMBRAMIENTO - a.ID_NOMBRAMIENTO
+    );
+  }, [nombramientos]);
 
   return (
-    <Box>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Gestión de Nombramientos
-      </Typography>
+    <Box sx={{ p: 4 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 4,
+          mb: 3,
+          borderRadius: 5,
+          background:
+            "linear-gradient(135deg, rgba(25,118,210,0.10), rgba(25,118,210,0.03))",
+          border: "1px solid rgba(25,118,210,0.08)",
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={3}
+          justifyContent="space-between"
+        >
+          <Box>
+            <Typography variant="h3" fontWeight={800}>
+              Gestión de Nombramientos
+            </Typography>
 
-      <Button variant="contained" onClick={abrirCrear} sx={{ mb: 3 }}>
-        Nuevo nombramiento
-      </Button>
+            <Typography color="text.secondary">
+              Administre nombramientos reales registrados en Oracle.
+            </Typography>
+          </Box>
 
-      <Paper elevation={2}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell><strong>Asambleísta</strong></TableCell>
-              <TableCell><strong>Sector</strong></TableCell>
-              <TableCell><strong>Puesto</strong></TableCell>
-              <TableCell><strong>Fecha inicio</strong></TableCell>
-              <TableCell><strong>Fecha fin</strong></TableCell>
-              <TableCell><strong>Estado</strong></TableCell>
-              <TableCell><strong>Acciones</strong></TableCell>
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {nombramientos.map((nombramiento) => (
-              <TableRow key={nombramiento.id}>
-                <TableCell>{nombramiento.asambleista}</TableCell>
-                <TableCell>{nombramiento.sector}</TableCell>
-                <TableCell>{nombramiento.puesto}</TableCell>
-                <TableCell>{nombramiento.fechaInicio}</TableCell>
-                <TableCell>{nombramiento.fechaFin}</TableCell>
-                <TableCell>{nombramiento.estado}</TableCell>
-                <TableCell>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => abrirEditar(nombramiento)}
-                  >
-                    Editar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={abrirCrear}
+            sx={{
+              height: 46,
+              px: 3,
+              borderRadius: 2,
+              fontWeight: 700,
+            }}
+          >
+            Nuevo nombramiento
+          </Button>
+        </Stack>
       </Paper>
 
-      <Modal open={open} onClose={cerrarModal}>
-        <Box sx={modalStyle}>
-          <Typography variant="h5" fontWeight="bold" gutterBottom>
-            {modoEdicion ? "Editar nombramiento" : "Nuevo nombramiento"}
+      {mensajeError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {mensajeError}
+        </Alert>
+      )}
+
+      {mensajeExito && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {mensajeExito}
+        </Alert>
+      )}
+
+      <Paper elevation={2}>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h5" fontWeight={800}>
+            Nombramientos registrados
           </Typography>
 
-          <TextField
-            fullWidth
-            label="Nombre del asambleísta"
-            name="asambleista"
-            value={form.asambleista}
-            onChange={handleChange}
-            margin="normal"
-          />
-
-          <TextField
-            select
-            fullWidth
-            label="Sector"
-            name="sector"
-            value={form.sector}
-            onChange={handleChange}
-            margin="normal"
-          >
-            <MenuItem value="Docente">Docente</MenuItem>
-            <MenuItem value="Administrativo">Administrativo</MenuItem>
-            <MenuItem value="Estudiantil">Estudiantil</MenuItem>
-            <MenuItem value="Egresado">Egresado</MenuItem>
-          </TextField>
-
-          <TextField
-            select
-            fullWidth
-            label="Puesto"
-            name="puesto"
-            value={form.puesto}
-            onChange={handleChange}
-            margin="normal"
-          >
-            <MenuItem value="Presidente">Presidente</MenuItem>
-            <MenuItem value="Presidenta">Presidenta</MenuItem>
-            <MenuItem value="Secretario">Secretario</MenuItem>
-            <MenuItem value="Secretaria">Secretaria</MenuItem>
-            <MenuItem value="Representante">Representante</MenuItem>
-            <MenuItem value="Suplente">Suplente</MenuItem>
-          </TextField>
-
-          <TextField
-            fullWidth
-            type="date"
-            label="Fecha de inicio"
-            name="fechaInicio"
-            value={form.fechaInicio}
-            onChange={handleChange}
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
-
-          <TextField
-            fullWidth
-            type="date"
-            label="Fecha de fin"
-            name="fechaFin"
-            value={form.fechaFin}
-            onChange={handleChange}
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
-
-          <TextField
-            select
-            fullWidth
-            label="Estado"
-            name="estado"
-            value={form.estado}
-            onChange={handleChange}
-            margin="normal"
-          >
-            <MenuItem value="Pendiente">Pendiente</MenuItem>
-            <MenuItem value="Activo">Activo</MenuItem>
-            <MenuItem value="Finalizado">Finalizado</MenuItem>
-            <MenuItem value="Anulado">Anulado</MenuItem>
-          </TextField>
-
-          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 3 }}>
-            <Button variant="outlined" onClick={cerrarModal}>
-              Cancelar
-            </Button>
-
-            <Button variant="contained" onClick={guardarNombramiento}>
-              Guardar
-            </Button>
-          </Box>
+          <Typography color="text.secondary">
+            Total: {nombramientos.length}
+          </Typography>
         </Box>
-      </Modal>
+
+        <Divider />
+
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell><strong>Asambleísta</strong></TableCell>
+                <TableCell><strong>Sector</strong></TableCell>
+                <TableCell><strong>Puesto</strong></TableCell>
+                <TableCell><strong>Condición</strong></TableCell>
+                <TableCell><strong>Inicio</strong></TableCell>
+                <TableCell><strong>Fin</strong></TableCell>
+                <TableCell><strong>Estado</strong></TableCell>
+                <TableCell align="right">
+                  <strong>Acciones</strong>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+
+            <TableBody>
+              {nombramientosOrdenados.map((nombramiento) => (
+                <TableRow key={nombramiento.ID_NOMBRAMIENTO}>
+                  <TableCell>
+                    {nombramiento.NOMBRE_ASAMBLEISTA}
+                  </TableCell>
+
+                  <TableCell>
+                    {nombramiento.NOMBRE_SECTOR}
+                  </TableCell>
+
+                  <TableCell>{nombramiento.PUESTO}</TableCell>
+
+                  <TableCell>
+                    <Chip
+                      label={nombramiento.CONDICION}
+                      size="small"
+                    />
+                  </TableCell>
+
+                  <TableCell>
+                    {normalizarFecha(nombramiento.INICIO)}
+                  </TableCell>
+
+                  <TableCell>
+                    {nombramiento.FIN
+                      ? normalizarFecha(nombramiento.FIN)
+                      : "Sin fecha fin"}
+                  </TableCell>
+
+                  <TableCell>
+                    <Chip
+                      label={nombramiento.ESTADO}
+                      color={
+                        nombramiento.ESTADO === "VIGENTE"
+                          ? "success"
+                          : "default"
+                      }
+                      size="small"
+                    />
+                  </TableCell>
+
+                  <TableCell align="right">
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      justifyContent="flex-end"
+                    >
+                      <Tooltip title="Editar">
+                        <IconButton
+                          color="primary"
+                          onClick={() => abrirEditar(nombramiento)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Eliminar">
+                        <IconButton
+                          color="error"
+                          onClick={() =>
+                            eliminarNombramientoVista(
+                              nombramiento.ID_NOMBRAMIENTO
+                            )
+                          }
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Dialog open={open} onClose={cerrarModal} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {modoEdicion
+            ? "Editar nombramiento"
+            : "Nuevo nombramiento"}
+        </DialogTitle>
+
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              select
+              label="Asambleísta"
+              name="id_asambleista"
+              value={form.id_asambleista}
+              onChange={handleChange}
+              fullWidth
+            >
+              {catalogos.asambleistas.map((a) => (
+                <MenuItem
+                  key={a.ID_ASAMBLEISTA}
+                  value={a.ID_ASAMBLEISTA}
+                >
+                  {a.NOMBRE}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Periodo AIR"
+              name="id_periodo"
+              value={form.id_periodo}
+              onChange={handleChange}
+              fullWidth
+            >
+              {catalogos.periodos.map((p) => (
+                <MenuItem
+                  key={p.ID_PERIODO}
+                  value={p.ID_PERIODO}
+                >
+                  {p.NOMBRE}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Sector"
+              name="id_sector"
+              value={form.id_sector}
+              onChange={handleChange}
+              fullWidth
+            >
+              {catalogos.sectores.map((s) => (
+                <MenuItem
+                  key={s.ID_SECTOR}
+                  value={s.ID_SECTOR}
+                >
+                  {s.NOMBRE}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Puesto"
+              name="puesto"
+              value={form.puesto}
+              onChange={handleChange}
+              fullWidth
+            />
+
+            <TextField
+              select
+              label="Condición"
+              name="condicion"
+              value={form.condicion}
+              onChange={handleChange}
+              fullWidth
+            >
+              {catalogos.condiciones.map((c) => (
+                <MenuItem key={c} value={c}>
+                  {c}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              type="date"
+              label="Fecha inicio"
+              name="inicio"
+              value={form.inicio}
+              onChange={handleChange}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <TextField
+              type="date"
+              label="Fecha fin"
+              name="fin"
+              value={form.fin}
+              onChange={handleChange}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
+
+            <TextField
+              select
+              label="Estado"
+              name="estado"
+              value={form.estado}
+              onChange={handleChange}
+              fullWidth
+            >
+              {catalogos.estados.map((e) => (
+                <MenuItem key={e} value={e}>
+                  {e}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Número resolución"
+              name="num_resolucion"
+              value={form.num_resolucion}
+              onChange={handleChange}
+              fullWidth
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={cerrarModal}>
+            Cancelar
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={guardarNombramiento}
+            disabled={guardando}
+          >
+            {guardando
+              ? "Guardando..."
+              : modoEdicion
+              ? "Actualizar nombramiento"
+              : "Guardar nombramiento"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
-
-const modalStyle = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  width: 520,
-  bgcolor: "background.paper",
-  borderRadius: 3,
-  boxShadow: 24,
-  p: 4,
-};
 
 export default Nombramientos;
