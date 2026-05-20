@@ -7,6 +7,7 @@ import Sesiones from "../views/Sesiones.jsx";
 import Certificaciones from "../views/Certificaciones.jsx";
 import Propuestas from "../views/Propuestas.jsx";
 import Nombramientos from "../views/Nombramientos.jsx";
+import Asistencias from "../views/Asistencias.jsx";
 
 function AppRoutes() {
   return (
@@ -35,6 +36,11 @@ function AppRoutes() {
           <Route
             path="/nombramientos"
             element={<Nombramientos />}
+          />
+
+          <Route
+            path="/asistencias"
+            element={<Asistencias />}
           />
         </Route>
       </Routes>

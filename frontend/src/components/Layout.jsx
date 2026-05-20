@@ -16,6 +16,7 @@ function Layout() {
         <nav style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "30px" }}>
           <Link style={linkStyle} to="/dashboard">Dashboard</Link>
           <Link style={linkStyle} to="/sesiones">Sesiones</Link>
+          <Link style={linkStyle} to="/asistencias">Asistencias</Link>
           <Link style={linkStyle} to="/certificaciones">Certificaciones</Link>
           <Link style={linkStyle} to="/propuestas">Propuestas</Link>
           <Link style={linkStyle} to="/nombramientos">Nombramientos</Link>

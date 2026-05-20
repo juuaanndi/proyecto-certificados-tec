@@ -1,12 +1,25 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { listarCertificaciones, obtenerCertificacion, crearCertificacion, actualizarCertificacion, eliminarCertificacion } = require('../controllers/certificacionController');
-const { validarCertificacion } = require('../middlewares/validacionMiddleware');
 
-router.get('/', listarCertificaciones);
-router.get('/:id', obtenerCertificacion);
-router.post('/', validarCertificacion, crearCertificacion);
-router.put('/:id', validarCertificacion, actualizarCertificacion);
-router.delete('/:id', eliminarCertificacion);
+const {
+  listarCertificaciones,
+  listarCatalogosCertificacion,
+  crearCertificacion,
+  actualizarCertificacion,
+  eliminarCertificacion,
+} = require("../controllers/certificacionController");
+
+router.get("/", listarCertificaciones);
+
+router.get(
+  "/catalogos",
+  listarCatalogosCertificacion
+);
+
+router.post("/", crearCertificacion);
+
+router.put("/:id", actualizarCertificacion);
+
+router.delete("/:id", eliminarCertificacion);
 
 module.exports = router;
