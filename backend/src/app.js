@@ -20,6 +20,7 @@ const nombramientoRoutes = require('./routes/nombramientoRoutes');
 const resolucionRoutes = require('./routes/resolucionRoutes');
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const normativaRoutes = require('./routes/normativaRoutes');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use('/api/nombramientos', verificarToken, nombramientoRoutes);
 app.use('/api/resoluciones', verificarToken, resolucionRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', verificarToken, dashboardRoutes);
+app.use('/api/normativa', verificarToken, normativaRoutes);
 
 app.use(errorHandler);
 module.exports = app;

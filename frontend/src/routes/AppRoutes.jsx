@@ -8,6 +8,7 @@ import Certificaciones from "../views/Certificaciones.jsx";
 import Propuestas from "../views/Propuestas.jsx";
 import Nombramientos from "../views/Nombramientos.jsx";
 import Asistencias from "../views/Asistencias.jsx";
+import Normativa from "../views/Normativa.jsx";
 
 function AppRoutes() {
   return (
@@ -42,6 +43,11 @@ function AppRoutes() {
             path="/asistencias"
             element={<Asistencias />}
           />
+
+          <Route
+            path="/normativa"
+            element={<Normativa />}
+        />
         </Route>
       </Routes>
     </BrowserRouter>
