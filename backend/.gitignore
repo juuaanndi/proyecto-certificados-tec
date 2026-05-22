@@ -1,5 +1,5 @@
 node_modules/
 .env
-src/config/wallet/
+src/config/wallet.zip
 src/config/Wallet_AIRTEC.zip
 src/config/firebase-credentials.json
