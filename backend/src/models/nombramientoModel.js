@@ -48,6 +48,18 @@ async function createNombramiento(data) {
   let connection;
   try {
     connection = await getConnection();
+
+    // Llamar al SP de validación de traslape
+    await connection.execute(
+      `BEGIN SP_VALIDAR_NOMBRAMIENTO(:id_asambleista, :id_sector, TO_DATE(:inicio, 'YYYY-MM-DD'), TO_DATE(:fin, 'YYYY-MM-DD')); END;`,
+      {
+        id_asambleista: data.id_asambleista,
+        id_sector: data.id_sector,
+        inicio: data.inicio,
+        fin: data.fin || '9999-12-31'
+      }
+    );
+
     const result = await connection.execute(
       `INSERT INTO NOMBRAMIENTO (ID_ASAMBLEISTA, ID_PERIODO, ID_SECTOR, PUESTO, CONDICION, INICIO, FIN, ESTADO, NUM_RESOLUCION)
        VALUES (:id_asambleista, :id_periodo, :id_sector, :puesto, :condicion, TO_DATE(:inicio, 'YYYY-MM-DD'), TO_DATE(:fin, 'YYYY-MM-DD'), :estado, :num_resolucion)
