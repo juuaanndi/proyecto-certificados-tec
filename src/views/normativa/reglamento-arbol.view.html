@@ -19,9 +19,16 @@
     header h1 { font-size: 20px; }
     header p { font-size: 13px; opacity: 0.8; }
 
+    .rol-badge {
+      margin-left: auto;
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 99px;
+      background: rgba(255,255,255,0.2);
+    }
+
     .container { display: flex; height: calc(100vh - 70px); }
 
-    /* Árbol */
     .tree-panel {
       width: 380px;
       background: white;
@@ -72,7 +79,6 @@
 
     .node-titulo { font-size: 13px; flex: 1; }
 
-    /* Panel de detalle */
     .detail-panel {
       flex: 1;
       padding: 24px;
@@ -83,7 +89,6 @@
     .detail-content { font-size: 15px; line-height: 1.8; color: #444; background: white; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
     .detail-empty { color: #aaa; font-size: 15px; margin-top: 40px; text-align: center; }
 
-    /* Formulario */
     .form-panel {
       background: white;
       border: 1px solid #ddd;
@@ -107,6 +112,10 @@
       background: #28a745; color: white; border: none; padding: 10px 20px;
       border-radius: 6px; cursor: pointer; font-size: 14px; margin-left: 8px;
     }
+    .readonly-msg {
+      color: #999; font-style: italic; margin-top: 16px; font-size: 14px;
+      padding: 12px; background: #f9f9f9; border-radius: 6px; border: 1px solid #eee;
+    }
 
     .notification {
       position: fixed; top: 20px; right: 20px;
@@ -124,6 +133,7 @@
     <h1>Reglamento AIR-TEC</h1>
     <p>Asamblea Institucional Representativa — Instituto Tecnológico de Costa Rica</p>
   </div>
+  <span class="rol-badge" id="rol-badge">Cargando...</span>
 </header>
 
 <div class="notification" id="notification"></div>
@@ -142,8 +152,14 @@
 <script>
   const API_BASE = 'http://localhost:3000/api';
   let token = localStorage.getItem('firebase_token') || '';
+  const rol = localStorage.getItem('user_rol') || 'ASAMBLEISTA';
+  const puedeEditar = rol === 'SECRETARIA' || rol === 'ADMINISTRADOR';
+
   let arbolData = [];
   let nodoSeleccionado = null;
+
+  // Mostrar rol en header
+  document.getElementById('rol-badge').textContent = rol;
 
   async function cargarArbol() {
     try {
@@ -207,16 +223,7 @@
     const hijosPosibles = ['CAPITULO', 'ARTICULO', 'INCISO'];
     const nivelHijo = hijosPosibles[niveles[nodo.NIVEL]];
 
-    document.getElementById('detail-panel').innerHTML = `
-      <h2>${nodo.TITULO}</h2>
-      <div class="detail-meta">
-        <span class="nivel-badge nivel-${nodo.NIVEL}">${nodo.NIVEL}</span>
-        <span class="vigencia-badge ${nodo.ESTADO_VIGENCIA}">${nodo.ESTADO_VIGENCIA}</span>
-        <span>Código: ${nodo.CODIGO}</span>
-        <span>Versión: ${nodo.VERSION}</span>
-      </div>
-      <div class="detail-content">${nodo.CONTENIDO || '<em>Sin contenido</em>'}</div>
-
+    const formulariosHTML = puedeEditar ? `
       <div class="form-panel" style="margin-top:20px">
         <h3>Publicar nueva versión</h3>
         <div class="form-group">
@@ -227,7 +234,6 @@
           Publicar nueva versión
         </button>
       </div>
-
       ${nivelHijo ? `
       <div class="form-panel">
         <h3>Agregar ${nivelHijo}</h3>
@@ -247,6 +253,18 @@
           Agregar ${nivelHijo}
         </button>
       </div>` : ''}
+    ` : '<p class="readonly-msg">🔒 Solo lectura — su rol de Asambleísta no permite editar la normativa.</p>';
+
+    document.getElementById('detail-panel').innerHTML = `
+      <h2>${nodo.TITULO}</h2>
+      <div class="detail-meta">
+        <span class="nivel-badge nivel-${nodo.NIVEL}">${nodo.NIVEL}</span>
+        <span class="vigencia-badge ${nodo.ESTADO_VIGENCIA}">${nodo.ESTADO_VIGENCIA}</span>
+        <span>Código: ${nodo.CODIGO}</span>
+        <span>Versión: ${nodo.VERSION}</span>
+      </div>
+      <div class="detail-content">${nodo.CONTENIDO || '<em>Sin contenido</em>'}</div>
+      ${formulariosHTML}
     `;
   }
 
@@ -272,7 +290,7 @@
         body: JSON.stringify({ codigo, nivel, titulo, contenido, id_padre: padre })
       });
       if (!res.ok) throw new Error('Error');
-      mostrarNotificacion('Nueva versión publicada — la anterior pasó a Histórica', 'success');
+      mostrarNotificacion('Nueva versión publicada — la anterior pasó a Histórica ✅', 'success');
       setTimeout(() => cargarArbol(), 1000);
     } catch (e) {
       mostrarNotificacion('Error al publicar versión', 'error');
@@ -294,7 +312,7 @@
       });
       const data = await res.json();
       if (!res.ok) { mostrarNotificacion(data.error, 'error'); return; }
-      mostrarNotificacion(`${nivel} agregado exitosamente`, 'success');
+      mostrarNotificacion(`${nivel} agregado exitosamente ✅`, 'success');
       setTimeout(() => cargarArbol(), 1000);
     } catch (e) {
       mostrarNotificacion('Error al agregar', 'error');
