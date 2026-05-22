@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificado Final — AIR-TEC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #003366; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 20px; }
+    .btn-back { background: none; border: 1px solid white; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+    .container { padding: 24px; max-width: 800px; margin: 0 auto; }
+    .card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; color: #003366; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .form-group label { font-size: 13px; color: #555; }
+    .form-group input { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+
+    .btn-primary { background: #003366; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-pdf { background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-left: 8px; }
+
+    .preview-box {
+      background: white; border: 2px solid #003366; border-radius: 8px;
+      padding: 40px; margin-top: 20px; display: none;
+    }
+    .preview-header { text-align: center; margin-bottom: 24px; }
+    .preview-header h2 { font-size: 16px; font-weight: bold; color: #003366; }
+    .preview-header h3 { font-size: 14px; font-weight: bold; }
+    .preview-nombre { text-align: center; font-size: 18px; font-weight: bold; margin: 20px 0 8px; }
+    .preview-cedula { text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 20px; }
+    .preview-body { font-size: 14px; line-height: 1.8; text-align: justify; }
+    .preview-firma { margin-top: 60px; text-align: right; font-size: 13px; }
+
+    .estado-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 13px; font-weight: bold; }
+    .estado-ACTIVO { background: #e6f4ea; color: #1e7e34; }
+    .estado-ANULADO { background: #fce8e6; color: #c62828; }
+
+    .notification { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 9999; }
+    .notification.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .notification.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Vista Previa de Certificado</h1>
+  </div>
+  <button class="btn-back" onclick="window.location.href='atestados-solicitud.view.html'">← Volver</button>
+</header>
+
+<div class="notification" id="notification"></div>
+
+<div class="container">
+  <div class="card">
+    <h2>Buscar Certificación</h2>
+    <div class="form-group">
+      <label>ID de Certificación</label>
+      <input type="number" id="id-cert" placeholder="Ingresá el ID">
+    </div>
+    <button class="btn-primary" onclick="buscarCertificacion()">Buscar</button>
+    <button class="btn-pdf" onclick="descargarPDF()">📄 Descargar PDF</button>
+  </div>
+
+  <div class="preview-box" id="preview-box">
+    <div class="preview-header">
+      <h2>DIRECTORIO DE LA ASAMBLEA INSTITUCIONAL REPRESENTATIVA</h2>
+      <h3>CONSTANCIA</h3>
+      <h3 id="prev-numero"></h3>
+    </div>
+
+    <p style="font-size:14px; line-height:1.8">
+      El presidente del Directorio de la Asamblea Institucional Representativa, hace constar que:
+    </p>
+
+    <div class="preview-nombre" id="prev-nombre"></div>
+    <div class="preview-cedula" id="prev-cedula"></div>
+
+    <div class="preview-body" id="prev-body"></div>
+
+    <div style="margin-top:16px">
+      Estado: <span class="estado-badge" id="prev-estado"></span>
+    </div>
+
+    <div class="preview-firma">
+      <p id="prev-fecha"></p>
+      <br>
+      <p><strong>Presidente del Directorio</strong></p>
+      <p>Asamblea Institucional Representativa</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:3000/api';
+  const token = localStorage.getItem('firebase_token') || '';
+  let certActual = null;
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('id')) {
+    document.getElementById('id-cert').value = params.get('id');
+    buscarCertificacion();
+  }
+
+  async function buscarCertificacion() {
+    const id = document.getElementById('id-cert').value;
+    if (!id) { mostrarNotificacion('Ingresá un ID', 'error'); return; }
+
+    try {
+      const res = await fetch(`${API_BASE}/certificaciones/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) { mostrarNotificacion('Certificación no encontrada', 'error'); return; }
+      certActual = await res.json();
+
+      document.getElementById('prev-numero').textContent = certActual.NUMERO_DOCUMENTO;
+      document.getElementById('prev-estado').textContent = certActual.ESTADO;
+      document.getElementById('prev-estado').className = `estado-badge estado-${certActual.ESTADO}`;
+
+      const fecha = certActual.FECHA_EMISION ? new Date(certActual.FECHA_EMISION).toLocaleDateString('es-CR') : '-';
+      document.getElementById('prev-fecha').textContent = `Emitido el ${fecha}`;
+      document.getElementById('prev-body').textContent = certActual.SNAPSHOT || 'Constancia generada por el sistema AIR-TEC';
+
+      document.getElementById('preview-box').style.display = 'block';
+      mostrarNotificacion('Certificación cargada', 'success');
+    } catch (e) {
+      mostrarNotificacion('Error al buscar certificación', 'error');
+    }
+  }
+
+  async function descargarPDF() {
+    const id = document.getElementById('id-cert').value;
+    if (!id) { mostrarNotificacion('Ingresá un ID primero', 'error'); return; }
+
+    try {
+      const res = await fetch(`${API_BASE}/pdf/certificado/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      mostrarNotificacion('PDF generado exitosamente', 'success');
+    } catch (e) {
+      mostrarNotificacion('Error al generar PDF', 'error');
+    }
+  }
+
+  function mostrarNotificacion(msg, tipo) {
+    const n = document.getElementById('notification');
+    n.textContent = msg;
+    n.className = `notification ${tipo}`;
+    n.style.display = 'block';
+    setTimeout(() => n.style.display = 'none', 3000);
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solicitud de Atestados — AIR-TEC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #003366; color: white; padding: 16px 24px; }
+    header h1 { font-size: 20px; }
+    header p { font-size: 13px; opacity: 0.8; }
+
+    .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
+    .card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; color: #003366; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 13px; color: #555; }
+    .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+
+    .btn-primary { background: #003366; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-pdf { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .btn-ver { background: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #003366; color: white; padding: 10px 12px; text-align: left; font-size: 13px; }
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+    tr:hover td { background: #f0f4ff; }
+
+    .estado-ACTIVO { color: #28a745; font-weight: bold; }
+    .estado-ANULADO { color: #dc3545; }
+
+    .notification { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 9999; }
+    .notification.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .notification.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Atestados y Certificaciones</h1>
+  <p>Asamblea Institucional Representativa — Instituto Tecnológico de Costa Rica</p>
+</header>
+
+<div class="notification" id="notification"></div>
+
+<div class="container">
+  <div class="card">
+    <h2>Nueva Certificación</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Número de documento *</label>
+        <input type="text" id="numero-doc" placeholder="Ej: DAIR-010-2025">
+      </div>
+      <div class="form-group">
+        <label>Fecha de emisión *</label>
+        <input type="date" id="fecha-emision">
+      </div>
+      <div class="form-group">
+        <label>ID Nombramiento *</label>
+        <input type="number" id="id-nombramiento" placeholder="ID del nombramiento">
+      </div>
+      <div class="form-group">
+        <label>ID Usuario Emisor *</label>
+        <input type="number" id="id-emisor" placeholder="ID del usuario emisor">
+      </div>
+    </div>
+    <br>
+    <button class="btn-primary" onclick="crearCertificacion()">Crear Certificación</button>
+  </div>
+
+  <div class="card">
+    <h2>Certificaciones Emitidas</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Número Documento</th>
+          <th>Fecha Emisión</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-certificaciones">
+        <tr><td colspan="5" style="text-align:center;color:#aaa">Cargando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:3000/api';
+  const token = localStorage.getItem('firebase_token') || '';
+
+  async function cargarCertificaciones() {
+    try {
+      const res = await fetch(`${API_BASE}/certificaciones`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const tbody = document.getElementById('tabla-certificaciones');
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#aaa">No hay certificaciones</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(c => `
+        <tr>
+          <td>${c.ID_CERTIFICACION}</td>
+          <td>${c.NUMERO_DOCUMENTO}</td>
+          <td>${c.FECHA_EMISION ? new Date(c.FECHA_EMISION).toLocaleDateString('es-CR') : '-'}</td>
+          <td><span class="estado-${c.ESTADO}">${c.ESTADO}</span></td>
+          <td>
+            <button class="btn-pdf" onclick="generarPDF(${c.ID_CERTIFICACION})">📄 PDF</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      mostrarNotificacion('Error al cargar certificaciones', 'error');
+    }
+  }
+
+  async function crearCertificacion() {
+    const numero = document.getElementById('numero-doc').value;
+    const fecha = document.getElementById('fecha-emision').value;
+    const idNombramiento = document.getElementById('id-nombramiento').value;
+    const idEmisor = document.getElementById('id-emisor').value;
+
+    if (!numero || !fecha || !idNombramiento || !idEmisor) {
+      mostrarNotificacion('Todos los campos son obligatorios', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/certificaciones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          numero_documento: numero,
+          fecha_emision: fecha,
+          id_nombramiento: parseInt(idNombramiento),
+          id_usuario_emisor: parseInt(idEmisor),
+          estado: 'ACTIVO'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { mostrarNotificacion(data.error, 'error'); return; }
+      mostrarNotificacion('Certificación creada exitosamente', 'success');
+      cargarCertificaciones();
+    } catch (e) {
+      mostrarNotificacion('Error al crear certificación', 'error');
+    }
+  }
+
+  async function generarPDF(id) {
+    try {
+      const res = await fetch(`${API_BASE}/pdf/certificado/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Error al generar PDF');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      mostrarNotificacion('PDF generado exitosamente', 'success');
+    } catch (e) {
+      mostrarNotificacion('Error al generar PDF', 'error');
+    }
+  }
+
+  function mostrarNotificacion(msg, tipo) {
+    const n = document.getElementById('notification');
+    n.textContent = msg;
+    n.className = `notification ${tipo}`;
+    n.style.display = 'block';
+    setTimeout(() => n.style.display = 'none', 3000);
+  }
+
+  cargarCertificaciones();
+</script>
+</body>
+</html>

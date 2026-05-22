@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compilador de Normativa — AIR-TEC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #003366; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 20px; }
+    header p { font-size: 13px; opacity: 0.8; }
+    .btn-back { background: none; border: 1px solid white; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+
+    .container { padding: 24px; max-width: 900px; margin: 0 auto; }
+    .card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; color: #003366; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+    .filtros { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filtro-group { display: flex; flex-direction: column; gap: 4px; }
+    .filtro-group label { font-size: 12px; color: #666; }
+    .filtro-group select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+
+    .normativa-doc { line-height: 1.8; }
+    .titulo-bloque { margin-bottom: 24px; }
+    .titulo-header { font-size: 18px; font-weight: bold; color: #003366; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #003366; }
+    .capitulo-header { font-size: 15px; font-weight: bold; color: #0066cc; margin: 16px 0 8px 0; }
+    .articulo-block { margin: 8px 0 8px 20px; }
+    .articulo-header { font-weight: bold; font-size: 14px; }
+    .articulo-content { font-size: 14px; color: #444; margin-top: 4px; }
+    .inciso-block { margin: 4px 0 4px 40px; font-size: 13px; color: #555; }
+
+    .badge-vigente { background: #e6f4ea; color: #1e7e34; padding: 2px 8px; border-radius: 99px; font-size: 11px; margin-left: 8px; }
+    .badge-historica { background: #fce8e6; color: #c62828; padding: 2px 8px; border-radius: 99px; font-size: 11px; margin-left: 8px; }
+
+    .btn-print { background: #003366; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .empty { text-align: center; color: #aaa; padding: 40px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Compilador y Visor de Normativa</h1>
+    <p>Vista compilada del reglamento institucional</p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn-back" onclick="window.location.href='reglamento-arbol.view.html'">← Árbol</button>
+    <button class="btn-print" onclick="window.print()">🖨 Imprimir</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="card">
+    <h2>Filtros</h2>
+    <div class="filtros">
+      <div class="filtro-group">
+        <label>Estado de vigencia</label>
+        <select id="filtro-vigencia" onchange="renderNormativa()">
+          <option value="VIGENTE">Solo vigentes</option>
+          <option value="HISTORICA">Solo históricas</option>
+          <option value="TODOS">Todos</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="doc-container">
+    <div class="empty">Cargando normativa...</div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:3000/api';
+  const token = localStorage.getItem('firebase_token') || '';
+  let arbolCompleto = [];
+
+  async function cargarNormativa() {
+    try {
+      const res = await fetch(`${API_BASE}/normativa/arbol`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      arbolCompleto = await res.json();
+      renderNormativa();
+    } catch (e) {
+      document.getElementById('doc-container').innerHTML = '<div class="empty">Error al cargar la normativa</div>';
+    }
+  }
+
+  function renderNormativa() {
+    const filtro = document.getElementById('filtro-vigencia').value;
+    const container = document.getElementById('doc-container');
+
+    if (!arbolCompleto.length) {
+      container.innerHTML = '<div class="empty">No hay normativa disponible</div>';
+      return;
+    }
+
+    let html = '<div class="normativa-doc">';
+
+    arbolCompleto.forEach(titulo => {
+      if (filtro !== 'TODOS' && titulo.ESTADO_VIGENCIA !== filtro) return;
+
+      html += `<div class="titulo-bloque">
+        <div class="titulo-header">
+          ${titulo.TITULO}
+          <span class="badge-${titulo.ESTADO_VIGENCIA.toLowerCase()}">${titulo.ESTADO_VIGENCIA}</span>
+        </div>`;
+
+      if (titulo.hijos) {
+        titulo.hijos.forEach(cap => {
+          html += `<div class="capitulo-header">${cap.TITULO}</div>`;
+
+          if (cap.hijos) {
+            cap.hijos.forEach(art => {
+              html += `<div class="articulo-block">
+                <div class="articulo-header">${art.TITULO}</div>
+                <div class="articulo-content">${art.CONTENIDO || ''}</div>`;
+
+              if (art.hijos) {
+                art.hijos.forEach(inc => {
+                  html += `<div class="inciso-block">${inc.TITULO}: ${inc.CONTENIDO || ''}</div>`;
+                });
+              }
+              html += '</div>';
+            });
+          }
+        });
+      }
+      html += '</div>';
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  cargarNormativa();
+</script>
+</body>
+</html>

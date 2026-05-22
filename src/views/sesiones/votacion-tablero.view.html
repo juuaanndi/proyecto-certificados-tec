@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tablero de Votación — AIR-TEC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #003366; color: white; padding: 16px 24px; }
+    header h1 { font-size: 20px; }
+    header p { font-size: 13px; opacity: 0.8; }
+
+    .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
+    .card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; color: #003366; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+    .votos-display { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+    .voto-box { flex: 1; min-width: 120px; border-radius: 8px; padding: 20px; text-align: center; }
+    .voto-box .numero { font-size: 42px; font-weight: bold; }
+    .voto-box .etiqueta { font-size: 13px; margin-top: 4px; }
+    .voto-box.favor { background: #e6f4ea; border: 2px solid #28a745; }
+    .voto-box.favor .numero { color: #1e7e34; }
+    .voto-box.contra { background: #fce8e6; border: 2px solid #dc3545; }
+    .voto-box.contra .numero { color: #c62828; }
+    .voto-box.abstencion { background: #fff3cd; border: 2px solid #ffc107; }
+    .voto-box.abstencion .numero { color: #856404; }
+    .voto-box.total { background: #f0f4ff; border: 2px solid #003366; }
+    .voto-box.total .numero { color: #003366; }
+
+    .resultado-bar { height: 20px; background: #eee; border-radius: 99px; overflow: hidden; margin-bottom: 8px; display: flex; }
+    .bar-favor { background: #28a745; height: 100%; transition: width 0.5s; }
+    .bar-contra { background: #dc3545; height: 100%; transition: width 0.5s; }
+    .bar-abstencion { background: #ffc107; height: 100%; transition: width 0.5s; }
+
+    .resultado-label { font-size: 13px; color: #666; margin-bottom: 16px; }
+    .resultado-aprobado { font-size: 18px; font-weight: bold; color: #1e7e34; text-align: center; padding: 12px; background: #e6f4ea; border-radius: 8px; }
+    .resultado-rechazado { font-size: 18px; font-weight: bold; color: #c62828; text-align: center; padding: 12px; background: #fce8e6; border-radius: 8px; }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+    .form-group label { font-size: 13px; color: #555; }
+    .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+
+    .votos-rapidos { display: flex; gap: 12px; margin-top: 16px; }
+    .btn-favor { background: #28a745; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 15px; flex: 1; }
+    .btn-contra { background: #dc3545; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 15px; flex: 1; }
+    .btn-abstencion { background: #ffc107; color: #333; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 15px; flex: 1; }
+    .btn-reset { background: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 12px; }
+
+    .notification { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 9999; }
+    .notification.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .notification.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Tablero de Votación</h1>
+  <p>Asamblea Institucional Representativa — Instituto Tecnológico de Costa Rica</p>
+</header>
+
+<div class="notification" id="notification"></div>
+
+<div class="container">
+  <div class="card">
+    <h2>Configurar Votación</h2>
+    <div class="form-group">
+      <label>Propuesta en votación</label>
+      <select id="select-propuesta">
+        <option value="">Seleccioná una propuesta...</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Total de asambleístas presentes</label>
+      <input type="number" id="total-presentes" value="0" min="0">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Registrar Votos</h2>
+    <div class="votos-rapidos">
+      <button class="btn-favor" onclick="agregarVoto('favor')">✓ A Favor</button>
+      <button class="btn-contra" onclick="agregarVoto('contra')">✗ En Contra</button>
+      <button class="btn-abstencion" onclick="agregarVoto('abstencion')">— Abstención</button>
+    </div>
+    <button class="btn-reset" onclick="resetearVotos()">Reiniciar votación</button>
+  </div>
+
+  <div class="card">
+    <h2>Resultado en Tiempo Real</h2>
+    <div class="votos-display">
+      <div class="voto-box favor">
+        <div class="numero" id="num-favor">0</div>
+        <div class="etiqueta">A Favor</div>
+      </div>
+      <div class="voto-box contra">
+        <div class="numero" id="num-contra">0</div>
+        <div class="etiqueta">En Contra</div>
+      </div>
+      <div class="voto-box abstencion">
+        <div class="numero" id="num-abstencion">0</div>
+        <div class="etiqueta">Abstenciones</div>
+      </div>
+      <div class="voto-box total">
+        <div class="numero" id="num-total">0</div>
+        <div class="etiqueta">Total Votos</div>
+      </div>
+    </div>
+
+    <div class="resultado-bar">
+      <div class="bar-favor" id="bar-favor" style="width:0%"></div>
+      <div class="bar-contra" id="bar-contra" style="width:0%"></div>
+      <div class="bar-abstencion" id="bar-abstencion" style="width:0%"></div>
+    </div>
+    <div class="resultado-label" id="resultado-label">Sin votos registrados</div>
+    <div id="resultado-final"></div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:3000/api';
+  const token = localStorage.getItem('firebase_token') || '';
+  let votos = { favor: 0, contra: 0, abstencion: 0 };
+
+  async function cargarPropuestas() {
+    try {
+      const res = await fetch(`${API_BASE}/propuestas`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const select = document.getElementById('select-propuesta');
+      data.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.ID_PROPUESTA;
+        opt.textContent = `${p.CODIGO_AIR} — ${p.TITULO}`;
+        select.appendChild(opt);
+      });
+    } catch (e) {
+      console.error('Error al cargar propuestas');
+    }
+  }
+
+  function agregarVoto(tipo) {
+    votos[tipo]++;
+    actualizarDisplay();
+    mostrarNotificacion(`Voto "${tipo}" registrado`, 'success');
+  }
+
+  function resetearVotos() {
+    votos = { favor: 0, contra: 0, abstencion: 0 };
+    actualizarDisplay();
+    mostrarNotificacion('Votación reiniciada', 'success');
+  }
+
+  function actualizarDisplay() {
+    const total = votos.favor + votos.contra + votos.abstencion;
+    document.getElementById('num-favor').textContent = votos.favor;
+    document.getElementById('num-contra').textContent = votos.contra;
+    document.getElementById('num-abstencion').textContent = votos.abstencion;
+    document.getElementById('num-total').textContent = total;
+
+    if (total > 0) {
+      const pFavor = (votos.favor / total * 100).toFixed(1);
+      const pContra = (votos.contra / total * 100).toFixed(1);
+      const pAbs = (votos.abstencion / total * 100).toFixed(1);
+
+      document.getElementById('bar-favor').style.width = pFavor + '%';
+      document.getElementById('bar-contra').style.width = pContra + '%';
+      document.getElementById('bar-abstencion').style.width = pAbs + '%';
+      document.getElementById('resultado-label').textContent = `A favor: ${pFavor}% | En contra: ${pContra}% | Abstenciones: ${pAbs}%`;
+
+      const mayoriaSimple = votos.favor > (total / 2);
+      document.getElementById('resultado-final').innerHTML = mayoriaSimple
+        ? '<div class="resultado-aprobado">✓ APROBADO por mayoría simple</div>'
+        : '<div class="resultado-rechazado">✗ NO APROBADO</div>';
+    } else {
+      document.getElementById('resultado-label').textContent = 'Sin votos registrados';
+      document.getElementById('resultado-final').innerHTML = '';
+    }
+  }
+
+  function mostrarNotificacion(msg, tipo) {
+    const n = document.getElementById('notification');
+    n.textContent = msg;
+    n.className = `notification ${tipo}`;
+    n.style.display = 'block';
+    setTimeout(() => n.style.display = 'none', 2000);
+  }
+
+  cargarPropuestas();
+</script>
+</body>
+</html>

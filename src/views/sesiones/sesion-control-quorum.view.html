@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Quórum — AIR-TEC</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #003366; color: white; padding: 16px 24px; }
+    header h1 { font-size: 20px; }
+    header p { font-size: 13px; opacity: 0.8; }
+
+    .container { padding: 24px; max-width: 1000px; margin: 0 auto; }
+    .card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; color: #003366; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+    .quorum-display {
+      display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .quorum-box {
+      flex: 1; min-width: 150px; background: #f0f4ff; border: 1px solid #cce;
+      border-radius: 8px; padding: 16px; text-align: center;
+    }
+    .quorum-box .numero { font-size: 36px; font-weight: bold; color: #003366; }
+    .quorum-box .etiqueta { font-size: 13px; color: #666; margin-top: 4px; }
+    .quorum-box.ok { background: #e6f4ea; border-color: #a8d5b5; }
+    .quorum-box.ok .numero { color: #1e7e34; }
+    .quorum-box.fail { background: #fce8e6; border-color: #f5c6cb; }
+    .quorum-box.fail .numero { color: #c62828; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 13px; color: #555; }
+    .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #003366; color: white; padding: 10px 12px; text-align: left; font-size: 13px; }
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+
+    .btn-primary { background: #003366; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 12px; }
+    .btn-asistio { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .btn-ausente { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+    .badge-S { background: #e6f4ea; color: #1e7e34; padding: 2px 8px; border-radius: 99px; font-size: 12px; }
+    .badge-N { background: #fce8e6; color: #c62828; padding: 2px 8px; border-radius: 99px; font-size: 12px; }
+
+    .notification { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 9999; }
+    .notification.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .notification.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Control de Quórum por Sesión</h1>
+  <p>Asamblea Institucional Representativa — Instituto Tecnológico de Costa Rica</p>
+</header>
+
+<div class="notification" id="notification"></div>
+
+<div class="container">
+  <div class="card">
+    <h2>Seleccionar Sesión</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Sesión</label>
+        <select id="select-sesion" onchange="cargarAsistencia()">
+          <option value="">Seleccioná una sesión...</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-quorum" style="display:none">
+    <div class="card">
+      <h2>Estado del Quórum</h2>
+      <div class="quorum-display">
+        <div class="quorum-box" id="box-total">
+          <div class="numero" id="num-total">0</div>
+          <div class="etiqueta">Total Asambleístas</div>
+        </div>
+        <div class="quorum-box" id="box-presentes">
+          <div class="numero" id="num-presentes">0</div>
+          <div class="etiqueta">Presentes</div>
+        </div>
+        <div class="quorum-box" id="box-minimo">
+          <div class="numero" id="num-minimo">0</div>
+          <div class="etiqueta">Quórum Mínimo</div>
+        </div>
+        <div class="quorum-box" id="box-estado">
+          <div class="numero" id="txt-estado">—</div>
+          <div class="etiqueta">Estado</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Registro de Asistencia</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Asambleísta</th>
+            <th>Cédula</th>
+            <th>Asistencia</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-asistencia">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:3000/api';
+  const token = localStorage.getItem('firebase_token') || '';
+  let sesiones = [];
+  let asistencias = [];
+
+  async function cargarSesiones() {
+    try {
+      const res = await fetch(`${API_BASE}/sesiones`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      sesiones = await res.json();
+      const select = document.getElementById('select-sesion');
+      sesiones.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.ID_SESION;
+        opt.textContent = `${s.NUMERO} — ${new Date(s.FECHA).toLocaleDateString('es-CR')} (${s.TIPO})`;
+        select.appendChild(opt);
+      });
+    } catch (e) {
+      mostrarNotificacion('Error al cargar sesiones', 'error');
+    }
+  }
+
+  async function cargarAsistencia() {
+    const idSesion = document.getElementById('select-sesion').value;
+    if (!idSesion) { document.getElementById('panel-quorum').style.display = 'none'; return; }
+
+    const sesion = sesiones.find(s => s.ID_SESION == idSesion);
+
+    try {
+      const res = await fetch(`${API_BASE}/asistencias/sesion/${idSesion}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      asistencias = await res.json();
+
+      const presentes = asistencias.filter(a => a.ASISTIO === 'S').length;
+      const total = asistencias.length;
+      const minimo = sesion.QUORUM_MINIMO || 0;
+      const cumple = presentes >= minimo;
+
+      document.getElementById('num-total').textContent = total;
+      document.getElementById('num-presentes').textContent = presentes;
+      document.getElementById('num-minimo').textContent = minimo;
+      document.getElementById('txt-estado').textContent = cumple ? '✓ OK' : '✗ No';
+
+      const boxEstado = document.getElementById('box-estado');
+      boxEstado.className = `quorum-box ${cumple ? 'ok' : 'fail'}`;
+
+      const tbody = document.getElementById('tabla-asistencia');
+      tbody.innerHTML = asistencias.map(a => `
+        <tr>
+          <td>${a.NOMBRE_ASAMBLEISTA}</td>
+          <td>—</td>
+          <td><span class="badge-${a.ASISTIO}">${a.ASISTIO === 'S' ? 'Presente' : 'Ausente'}</span></td>
+          <td>
+            <button class="btn-asistio" onclick="marcarAsistencia(${a.ID_ASISTENCIA}, 'S')">✓</button>
+            <button class="btn-ausente" onclick="marcarAsistencia(${a.ID_ASISTENCIA}, 'N')">✗</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('panel-quorum').style.display = 'block';
+    } catch (e) {
+      mostrarNotificacion('Error al cargar asistencia', 'error');
+    }
+  }
+
+  async function marcarAsistencia(id, valor) {
+    try {
+      await fetch(`${API_BASE}/asistencias/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ asistio: valor })
+      });
+      mostrarNotificacion('Asistencia actualizada', 'success');
+      cargarAsistencia();
+    } catch (e) {
+      mostrarNotificacion('Error al actualizar asistencia', 'error');
+    }
+  }
+
+  function mostrarNotificacion(msg, tipo) {
+    const n = document.getElementById('notification');
+    n.textContent = msg;
+    n.className = `notification ${tipo}`;
+    n.style.display = 'block';
+    setTimeout(() => n.style.display = 'none', 3000);
+  }
+
+  cargarSesiones();
+</script>
+</body>
+</html>
