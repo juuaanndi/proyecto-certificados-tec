@@ -469,6 +469,8 @@ VALUES ('secretaria', 'secretaria@tec.ac.cr', 'firebase_auth', 'ACTIVO');
 INSERT INTO USUARIO (username, email, password_hash, estado)
 VALUES ('asambleista', 'asambleista@tec.ac.cr', 'firebase_auth', 'ACTIVO');
 
+INSERT INTO PERMISO (nombre_accion) VALUES ('ACCESO_SISTEMA');
+
 INSERT INTO ROL_PERMISO VALUES (1, 1);
 INSERT INTO ROL_PERMISO VALUES (2, 1);
 INSERT INTO ROL_PERMISO VALUES (3, 1);
