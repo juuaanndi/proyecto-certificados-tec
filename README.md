@@ -67,3 +67,10 @@ El sistema permite gestionar asambleístas, nombramientos, sesiones, normativa i
 Instituto Tecnológico de Costa Rica
 Asamblea Institucional Representativa
 2025-2026
+
+
+## Video Explicativo
+
+[![Video AIR-TEC Sprint 2](https://img.youtube.com/vi/mzFtPMAsJJQ/0.jpg)](https://youtu.be/mzFtPMAsJJQ)
+
+[Ver video en YouTube](https://youtu.be/mzFtPMAsJJQ)

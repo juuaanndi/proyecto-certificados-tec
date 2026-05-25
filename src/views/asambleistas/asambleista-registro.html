@@ -117,9 +117,18 @@
       <input type="text" id="nom-puesto" placeholder="Ej: Representante Sector Docente">
     </div>
     <div class="form-group" style="margin-bottom:12px">
+      <label>Sector *</label>
+      <select id="nom-sector">
+        <option value="1">Docente</option>
+        <option value="2">Administrativo</option>
+        <option value="3">Estudiantil</option>
+        <option value="4">Consejo Institucional</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
       <label>Condición</label>
       <select id="nom-condicion">
-        <option value="PROPIETARIO">Propietario</option>
+        <option value="TITULAR">Titular</option>
         <option value="SUPLENTE">Suplente</option>
       </select>
     </div>
@@ -239,15 +248,34 @@
       return;
     }
 
-    // Validar traslape de fechas
     if (fin && inicio > fin) {
       mostrarNotificacion('La fecha de fin no puede ser anterior al inicio', 'error');
       return;
     }
 
-    cerrarModal();
-    mostrarNotificacion('Nombramiento agregado exitosamente', 'success');
-    await cargarNombramientos();
+    try {
+      const res = await fetch(`${API_BASE}/nombramientos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          id_asambleista: parseInt(idAsambleista),
+          id_periodo: 1,
+          id_sector: parseInt(document.getElementById('nom-sector').value),
+          puesto: puesto,
+          condicion: condicion,
+          inicio: inicio,
+          fin: fin || null,
+          estado: 'VIGENTE'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { mostrarNotificacion(data.error || 'Error al guardar', 'error'); return; }
+      cerrarModal();
+      mostrarNotificacion('Nombramiento agregado exitosamente', 'success');
+      await cargarNombramientos();
+    } catch (e) {
+      mostrarNotificacion('Error al guardar nombramiento', 'error');
+    }
   }
 
   function mostrarNotificacion(msg, tipo) {
