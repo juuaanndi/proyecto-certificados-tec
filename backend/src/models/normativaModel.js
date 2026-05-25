@@ -7,15 +7,26 @@ async function getArbolNormativa() {
     connection = await getConnection();
     const result = await connection.execute(
       `SELECT ID_NORMATIVA, ID_PADRE, NIVEL, CODIGO, TITULO, 
-              CONTENIDO, ESTADO_VIGENCIA, FECHA_INICIO_VIGENCIA, 
-              FECHA_FIN_VIGENCIA, VERSION
+              TO_CHAR(CONTENIDO) AS CONTENIDO, ESTADO_VIGENCIA, VERSION
        FROM NORMATIVA
        WHERE ESTADO_VIGENCIA = 'VIGENTE'
        ORDER BY NIVEL, CODIGO`,
       [],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      { outFormat: oracledb.OUT_FORMAT_OBJECT, fetchTypeMap: new Map() }
     );
-    return construirArbol(result.rows);
+
+    const filas = result.rows.map(row => ({
+      ID_NORMATIVA: row.ID_NORMATIVA,
+      ID_PADRE: row.ID_PADRE,
+      NIVEL: row.NIVEL,
+      CODIGO: row.CODIGO,
+      TITULO: row.TITULO,
+      CONTENIDO: row.CONTENIDO,
+      ESTADO_VIGENCIA: row.ESTADO_VIGENCIA,
+      VERSION: row.VERSION
+    }));
+
+    return construirArbol(filas);
   } catch (error) {
     throw error;
   } finally {
@@ -28,14 +39,22 @@ function construirArbol(filas) {
   const raices = [];
 
   filas.forEach(fila => {
-    mapa[fila.ID_NORMATIVA] = { ...fila, hijos: [] };
+    mapa[fila.ID_NORMATIVA] = { 
+      ID_NORMATIVA: fila.ID_NORMATIVA,
+      ID_PADRE: fila.ID_PADRE,
+      NIVEL: fila.NIVEL,
+      CODIGO: fila.CODIGO,
+      TITULO: fila.TITULO,
+      CONTENIDO: fila.CONTENIDO,
+      ESTADO_VIGENCIA: fila.ESTADO_VIGENCIA,
+      VERSION: fila.VERSION,
+      hijos: []
+    };
   });
 
   filas.forEach(fila => {
-    if (fila.ID_PADRE) {
-      if (mapa[fila.ID_PADRE]) {
-        mapa[fila.ID_PADRE].hijos.push(mapa[fila.ID_NORMATIVA]);
-      }
+    if (fila.ID_PADRE && mapa[fila.ID_PADRE]) {
+      mapa[fila.ID_PADRE].hijos.push(mapa[fila.ID_NORMATIVA]);
     } else {
       raices.push(mapa[fila.ID_NORMATIVA]);
     }

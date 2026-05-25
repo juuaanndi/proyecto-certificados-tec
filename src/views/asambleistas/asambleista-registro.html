@@ -54,7 +54,7 @@
 <body>
 
 <header>
-  <button class="btn-back" onclick="window.location.href='asambleista-lista.view.html'">← Volver</button>
+  <button class="btn-back" onclick="window.location.href='asambleista-lista.html'">← Volver</button>
   <div>
     <h1 id="page-title">Nuevo Asambleísta</h1>
   </div>
@@ -169,31 +169,34 @@
   }
 
   async function cargarNombramientos() {
-    try {
-      const res = await fetch(`${API_BASE}/nombramientos`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const todos = await res.json();
-      const mios = todos.filter(n => n.ID_ASAMBLEISTA == idAsambleista);
-      const tbody = document.getElementById('tabla-nombramientos');
-      if (!mios.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa">Sin nombramientos</td></tr>';
-        return;
-      }
-      tbody.innerHTML = mios.map(n => `
-        <tr>
-          <td>${n.PUESTO}</td>
-          <td>${n.ID_SECTOR}</td>
-          <td>${n.CONDICION}</td>
-          <td>${n.INICIO ? new Date(n.INICIO).toLocaleDateString('es-CR') : '-'}</td>
-          <td>${n.FIN ? new Date(n.FIN).toLocaleDateString('es-CR') : 'Vigente'}</td>
-          <td class="estado-${n.ESTADO}">${n.ESTADO}</td>
-        </tr>
-      `).join('');
-    } catch (e) {
-      mostrarNotificacion('Error al cargar nombramientos', 'error');
+  try {
+    const res = await fetch(`${API_BASE}/nombramientos`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const todos = await res.json();
+    console.log('todos:', todos);
+    console.log('idAsambleista:', idAsambleista, typeof idAsambleista);
+    const mios = todos.filter(n => String(n.ID_ASAMBLEISTA) === String(idAsambleista));
+    console.log('mios:', mios);
+    const tbody = document.getElementById('tabla-nombramientos');
+    if (!mios.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#aaa">Sin nombramientos</td></tr>';
+      return;
     }
+    tbody.innerHTML = mios.map(n => `
+      <tr>
+        <td>${n.PUESTO}</td>
+        <td>${n.ID_SECTOR}</td>
+        <td>${n.CONDICION}</td>
+        <td>${n.INICIO ? new Date(n.INICIO).toLocaleDateString('es-CR') : '-'}</td>
+        <td>${n.FIN ? new Date(n.FIN).toLocaleDateString('es-CR') : 'Vigente'}</td>
+        <td class="estado-${n.ESTADO}">${n.ESTADO}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    mostrarNotificacion('Error al cargar nombramientos', 'error');
   }
+}
 
   async function guardarAsambleista() {
     const nombre = document.getElementById('nombre').value;

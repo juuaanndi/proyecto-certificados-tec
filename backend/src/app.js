@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 
 // Rutas protegidas
 app.use('/api/usuarios', verificarToken, usuarioRoutes);
-app.use('/api/asambleistas', verificarToken, asambleistaRoutes);
+app.use('/api/asambleistas', asambleistaRoutes);
 app.use('/api/sesiones', verificarToken, sesionRoutes);
 app.use('/api/certificaciones', verificarToken, certificacionRoutes);
 app.use('/api/propuestas', verificarToken, propuestaRoutes);
@@ -42,9 +42,9 @@ app.use('/api/comisiones', verificarToken, comisionRoutes);
 app.use('/api/actas', verificarToken, actaRoutes);
 app.use('/api/pdf', verificarToken, pdfRoutes);
 app.use('/api/asistencias', verificarToken, asistenciaRoutes);
-app.use('/api/nombramientos', verificarToken, nombramientoRoutes);
+app.use('/api/nombramientos', nombramientoRoutes);
 app.use('/api/resoluciones', verificarToken, resolucionRoutes);
-app.use('/api/normativa', verificarToken, normativaRoutes);
+app.use('/api/normativa', normativaRoutes);
 app.use('/api/auth', authRoutes);
 
 app.use(errorHandler);
