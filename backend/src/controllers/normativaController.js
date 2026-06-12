@@ -1,74 +1,131 @@
-const { getArbolNormativa, getNormativaById, createNormativa, getHistoricoNormativa } = require('../models/normativaModel');
+const {
+  getElementosNormativos,
+  getElementoNormativoById,
+  createElementoNormativo,
+  updateElementoNormativo,
+  publicarNuevaVersion,
+  deleteElementoNormativo,
+} = require("../models/normativaModel");
 
-async function obtenerArbol(req, res) {
+async function listarElementos(req, res) {
   try {
-    const arbol = await getArbolNormativa();
-    res.json(arbol);
+    const elementos = await getElementosNormativos();
+    res.json(elementos);
   } catch (error) {
-    console.error('Error al obtener árbol de normativa:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error("Error listando normativa:", error);
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+    });
   }
 }
 
-async function obtenerNormativa(req, res) {
+async function obtenerElemento(req, res) {
   try {
-    const normativa = await getNormativaById(req.params.id);
-    if (!normativa) {
-      return res.status(404).json({ error: 'Normativa no encontrada' });
+    const elemento = await getElementoNormativoById(req.params.id);
+
+    if (!elemento) {
+      return res.status(404).json({
+        error: "Elemento normativo no encontrado",
+      });
     }
-    res.json(normativa);
+
+    res.json(elemento);
   } catch (error) {
-    console.error('Error al obtener normativa:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error("Error obteniendo elemento:", error);
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+    });
   }
 }
 
-async function crearNormativa(req, res) {
+async function crearElemento(req, res) {
   try {
-    const { nivel, id_padre } = req.body;
+    const id = await createElementoNormativo(req.body);
 
-    // Validación jerárquica
-    if (nivel === 'CAPITULO' && !id_padre) {
-      return res.status(400).json({ error: 'Un capítulo debe tener un título padre' });
-    }
-    if (nivel === 'ARTICULO' && !id_padre) {
-      return res.status(400).json({ error: 'Un artículo debe tener un capítulo padre' });
-    }
-    if (nivel === 'INCISO' && !id_padre) {
-      return res.status(400).json({ error: 'Un inciso debe tener un artículo padre' });
-    }
-
-    // Validar que el padre tenga el nivel correcto
-    if (id_padre) {
-      const padre = await getNormativaById(id_padre);
-      if (!padre) {
-        return res.status(404).json({ error: 'Nodo padre no encontrado' });
-      }
-
-      const jerarquia = { TITULO: 0, CAPITULO: 1, ARTICULO: 2, INCISO: 3 };
-      if (jerarquia[nivel] !== jerarquia[padre.NIVEL] + 1) {
-        return res.status(400).json({ 
-          error: `Un ${nivel} solo puede estar dentro de un ${Object.keys(jerarquia)[jerarquia[nivel] - 1]}` 
-        });
-      }
-    }
-
-    const id = await createNormativa(req.body);
-    res.status(201).json({ message: 'Normativa creada', id });
+    res.status(201).json({
+      message: "Elemento normativo creado correctamente",
+      id,
+    });
   } catch (error) {
-    console.error('Error al crear normativa:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error("Error creando elemento:", error);
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+    });
   }
 }
 
-async function obtenerHistorico(req, res) {
+async function actualizarElemento(req, res) {
   try {
-    const historico = await getHistoricoNormativa(req.params.codigo);
-    res.json(historico);
+    await updateElementoNormativo(req.params.id, req.body);
+
+    res.json({
+      message: "Elemento normativo actualizado correctamente",
+    });
   } catch (error) {
-    console.error('Error al obtener histórico:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error("Error actualizando elemento:", error);
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+    });
   }
 }
 
-module.exports = { obtenerArbol, obtenerNormativa, crearNormativa, obtenerHistorico };
+async function nuevaVersion(req, res) {
+  try {
+    const nuevoId = await publicarNuevaVersion(
+      req.params.id,
+      req.body
+    );
+
+    if (!nuevoId) {
+      return res.status(404).json({
+        error: "Elemento normativo no encontrado",
+      });
+    }
+
+    res.json({
+      message: "Nueva versión publicada correctamente",
+      nuevoId,
+    });
+  } catch (error) {
+    console.error("Error publicando nueva versión:", error);
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+async function eliminarElemento(req, res) {
+  try {
+    await deleteElementoNormativo(req.params.id);
+
+    res.json({
+      message: "Elemento normativo eliminado correctamente",
+    });
+  } catch (error) {
+    console.error("Error eliminando elemento:", error);
+
+    if (error.code === "TIENE_HIJOS") {
+      return res.status(400).json({
+        error: error.message,
+      });
+    }
+
+    res.status(500).json({
+      error: "Error interno del servidor",
+    });
+  }
+}
+
+module.exports = {
+  listarElementos,
+  obtenerElemento,
+  crearElemento,
+  actualizarElemento,
+  nuevaVersion,
+  eliminarElemento,
+};

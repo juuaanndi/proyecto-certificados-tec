@@ -1,142 +1,357 @@
-const { getConnection } = require('../config/db');
-const oracledb = require('oracledb');
+const { getConnection } = require("../config/db");
+const oracledb = require("oracledb");
 
-async function getArbolNormativa() {
+async function getElementosNormativos() {
   let connection;
+
   try {
     connection = await getConnection();
+
     const result = await connection.execute(
-      `SELECT ID_NORMATIVA, ID_PADRE, NIVEL, CODIGO, TITULO, 
-              TO_CHAR(CONTENIDO) AS CONTENIDO, ESTADO_VIGENCIA, VERSION
-       FROM NORMATIVA
-       WHERE ESTADO_VIGENCIA = 'VIGENTE'
-       ORDER BY NIVEL, CODIGO`,
+      `
+      SELECT
+        ID_ELEMENTO,
+        ID_PADRE,
+        TIPO,
+        TITULO,
+        CONTENIDO,
+        ORDEN,
+        ESTADO_VIGENCIA,
+        TO_CHAR(FECHA_INICIO_VIGENCIA, 'YYYY-MM-DD') AS FECHA_INICIO_VIGENCIA,
+        TO_CHAR(FECHA_FIN_VIGENCIA, 'YYYY-MM-DD') AS FECHA_FIN_VIGENCIA,
+        ORIGEN
+      FROM ELEMENTO_NORMATIVO
+      ORDER BY
+        NVL(ID_PADRE, 0),
+        NVL(ORDEN, 0),
+        ID_ELEMENTO
+      `,
       [],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT, fetchTypeMap: new Map() }
-    );
-
-    const filas = result.rows.map(row => ({
-      ID_NORMATIVA: row.ID_NORMATIVA,
-      ID_PADRE: row.ID_PADRE,
-      NIVEL: row.NIVEL,
-      CODIGO: row.CODIGO,
-      TITULO: row.TITULO,
-      CONTENIDO: row.CONTENIDO,
-      ESTADO_VIGENCIA: row.ESTADO_VIGENCIA,
-      VERSION: row.VERSION
-    }));
-
-    return construirArbol(filas);
-  } catch (error) {
-    throw error;
-  } finally {
-    if (connection) await connection.close();
-  }
-}
-
-function construirArbol(filas) {
-  const mapa = {};
-  const raices = [];
-
-  filas.forEach(fila => {
-    mapa[fila.ID_NORMATIVA] = { 
-      ID_NORMATIVA: fila.ID_NORMATIVA,
-      ID_PADRE: fila.ID_PADRE,
-      NIVEL: fila.NIVEL,
-      CODIGO: fila.CODIGO,
-      TITULO: fila.TITULO,
-      CONTENIDO: fila.CONTENIDO,
-      ESTADO_VIGENCIA: fila.ESTADO_VIGENCIA,
-      VERSION: fila.VERSION,
-      hijos: []
-    };
-  });
-
-  filas.forEach(fila => {
-    if (fila.ID_PADRE && mapa[fila.ID_PADRE]) {
-      mapa[fila.ID_PADRE].hijos.push(mapa[fila.ID_NORMATIVA]);
-    } else {
-      raices.push(mapa[fila.ID_NORMATIVA]);
-    }
-  });
-
-  return raices;
-}
-
-async function getNormativaById(id) {
-  let connection;
-  try {
-    connection = await getConnection();
-    const result = await connection.execute(
-      `SELECT ID_NORMATIVA, ID_PADRE, NIVEL, CODIGO, TITULO,
-              CONTENIDO, ESTADO_VIGENCIA, FECHA_INICIO_VIGENCIA,
-              FECHA_FIN_VIGENCIA, VERSION
-       FROM NORMATIVA WHERE ID_NORMATIVA = :id`,
-      [id],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
-    return result.rows[0];
-  } catch (error) {
-    throw error;
-  } finally {
-    if (connection) await connection.close();
-  }
-}
-
-async function createNormativa(data) {
-  let connection;
-  try {
-    connection = await getConnection();
-
-    // Verificar si ya existe una versión vigente con el mismo código
-    const existe = await connection.execute(
-      `SELECT VERSION FROM NORMATIVA WHERE CODIGO = :codigo AND ESTADO_VIGENCIA = 'VIGENTE'`,
-      [data.codigo],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
-
-    const nuevaVersion = existe.rows.length > 0 ? existe.rows[0].VERSION + 1 : 1;
-
-    const result = await connection.execute(
-      `INSERT INTO NORMATIVA (ID_PADRE, NIVEL, CODIGO, TITULO, CONTENIDO, VERSION)
-       VALUES (:id_padre, :nivel, :codigo, :titulo, :contenido, :version)
-       RETURNING ID_NORMATIVA INTO :id`,
       {
-        id_padre: data.id_padre || null,
-        nivel: data.nivel,
-        codigo: data.codigo,
-        titulo: data.titulo,
-        contenido: data.contenido || null,
-        version: nuevaVersion,
-        id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
-      },
-      { autoCommit: true }
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
+      }
     );
-    return result.outBinds.id[0];
-  } catch (error) {
-    throw error;
+
+    return result.rows;
   } finally {
-    if (connection) await connection.close();
+    if (connection) {
+      await connection.close();
+    }
   }
 }
 
-async function getHistoricoNormativa(codigo) {
+async function getElementoNormativoById(id) {
   let connection;
+
   try {
     connection = await getConnection();
+
     const result = await connection.execute(
-      `SELECT ID_NORMATIVA, CODIGO, TITULO, CONTENIDO, ESTADO_VIGENCIA,
-              FECHA_INICIO_VIGENCIA, FECHA_FIN_VIGENCIA, VERSION
-       FROM NORMATIVA WHERE CODIGO = :codigo ORDER BY VERSION DESC`,
-      [codigo],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      `
+      SELECT
+        ID_ELEMENTO,
+        ID_PADRE,
+        TIPO,
+        TITULO,
+        CONTENIDO,
+        ORDEN,
+        ESTADO_VIGENCIA,
+        TO_CHAR(FECHA_INICIO_VIGENCIA, 'YYYY-MM-DD') AS FECHA_INICIO_VIGENCIA,
+        TO_CHAR(FECHA_FIN_VIGENCIA, 'YYYY-MM-DD') AS FECHA_FIN_VIGENCIA,
+        ORIGEN
+      FROM ELEMENTO_NORMATIVO
+      WHERE ID_ELEMENTO = :id
+      `,
+      {
+        id: Number(id),
+      },
+      {
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
+      }
     );
-    return result.rows;
-  } catch (error) {
-    throw error;
+
+    return result.rows[0];
   } finally {
-    if (connection) await connection.close();
+    if (connection) {
+      await connection.close();
+    }
   }
 }
 
-module.exports = { getArbolNormativa, getNormativaById, createNormativa, getHistoricoNormativa };
+async function createElementoNormativo(data) {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const result = await connection.execute(
+      `
+      INSERT INTO ELEMENTO_NORMATIVO (
+        ID_PADRE,
+        TIPO,
+        TITULO,
+        CONTENIDO,
+        ORDEN,
+        ESTADO_VIGENCIA,
+        FECHA_INICIO_VIGENCIA,
+        FECHA_FIN_VIGENCIA,
+        ORIGEN
+      )
+      VALUES (
+        :id_padre,
+        :tipo,
+        :titulo,
+        :contenido,
+        :orden,
+        :estado_vigencia,
+        TO_DATE(:fecha_inicio_vigencia, 'YYYY-MM-DD'),
+        CASE
+          WHEN :fecha_fin_vigencia IS NULL OR :fecha_fin_vigencia = ''
+          THEN NULL
+          ELSE TO_DATE(:fecha_fin_vigencia, 'YYYY-MM-DD')
+        END,
+        :origen
+      )
+      RETURNING ID_ELEMENTO INTO :id
+      `,
+      {
+        id_padre:
+          data.id_padre === "" ||
+          data.id_padre === null ||
+          data.id_padre === undefined
+            ? null
+            : Number(data.id_padre),
+        tipo: String(data.tipo || "").toUpperCase(),
+        titulo: data.titulo || null,
+        contenido: data.contenido || null,
+        orden:
+          data.orden === "" || data.orden === null || data.orden === undefined
+            ? null
+            : Number(data.orden),
+        estado_vigencia: String(data.estado_vigencia || "VIGENTE").toUpperCase(),
+        fecha_inicio_vigencia: data.fecha_inicio_vigencia,
+        fecha_fin_vigencia: data.fecha_fin_vigencia || null,
+        origen: data.origen || null,
+        id: {
+          type: oracledb.NUMBER,
+          dir: oracledb.BIND_OUT,
+        },
+      },
+      {
+        autoCommit: true,
+      }
+    );
+
+    return result.outBinds.id[0];
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+}
+
+async function updateElementoNormativo(id, data) {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const result = await connection.execute(
+      `
+      UPDATE ELEMENTO_NORMATIVO
+      SET
+        ID_PADRE = :id_padre,
+        TIPO = :tipo,
+        TITULO = :titulo,
+        CONTENIDO = :contenido,
+        ORDEN = :orden,
+        ESTADO_VIGENCIA = :estado_vigencia,
+        FECHA_INICIO_VIGENCIA = TO_DATE(:fecha_inicio_vigencia, 'YYYY-MM-DD'),
+        FECHA_FIN_VIGENCIA =
+          CASE
+            WHEN :fecha_fin_vigencia IS NULL OR :fecha_fin_vigencia = ''
+            THEN NULL
+            ELSE TO_DATE(:fecha_fin_vigencia, 'YYYY-MM-DD')
+          END,
+        ORIGEN = :origen
+      WHERE ID_ELEMENTO = :id
+      `,
+      {
+        id: Number(id),
+        id_padre:
+          data.id_padre === "" ||
+          data.id_padre === null ||
+          data.id_padre === undefined
+            ? null
+            : Number(data.id_padre),
+        tipo: String(data.tipo || "").toUpperCase(),
+        titulo: data.titulo || null,
+        contenido: data.contenido || null,
+        orden:
+          data.orden === "" || data.orden === null || data.orden === undefined
+            ? null
+            : Number(data.orden),
+        estado_vigencia: String(data.estado_vigencia || "VIGENTE").toUpperCase(),
+        fecha_inicio_vigencia: data.fecha_inicio_vigencia,
+        fecha_fin_vigencia: data.fecha_fin_vigencia || null,
+        origen: data.origen || null,
+      },
+      {
+        autoCommit: true,
+      }
+    );
+
+    return result.rowsAffected;
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+}
+
+async function publicarNuevaVersion(id, data) {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const actual = await connection.execute(
+      `
+      SELECT
+        ID_ELEMENTO,
+        ID_PADRE,
+        TIPO,
+        TITULO,
+        ORDEN,
+        ORIGEN
+      FROM ELEMENTO_NORMATIVO
+      WHERE ID_ELEMENTO = :id
+      `,
+      { id: Number(id) },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const elementoActual = actual.rows[0];
+
+    if (!elementoActual) {
+      return null;
+    }
+
+    await connection.execute(
+      `
+      UPDATE ELEMENTO_NORMATIVO
+      SET
+        ESTADO_VIGENCIA = 'HISTORICA',
+        FECHA_FIN_VIGENCIA = SYSDATE
+      WHERE ID_ELEMENTO = :id
+      `,
+      { id: Number(id) }
+    );
+
+    const result = await connection.execute(
+      `
+      INSERT INTO ELEMENTO_NORMATIVO (
+        ID_PADRE,
+        TIPO,
+        TITULO,
+        CONTENIDO,
+        ORDEN,
+        ESTADO_VIGENCIA,
+        FECHA_INICIO_VIGENCIA,
+        FECHA_FIN_VIGENCIA,
+        ORIGEN
+      )
+      VALUES (
+        :id_padre,
+        :tipo,
+        :titulo,
+        :contenido,
+        :orden,
+        'VIGENTE',
+        TO_DATE(:fecha_inicio_vigencia, 'YYYY-MM-DD'),
+        NULL,
+        :origen
+      )
+      RETURNING ID_ELEMENTO INTO :nuevo_id
+      `,
+      {
+        id_padre: elementoActual.ID_PADRE,
+        tipo: elementoActual.TIPO,
+        titulo: data.titulo || elementoActual.TITULO,
+        contenido: data.contenido || null,
+        orden: elementoActual.ORDEN,
+        fecha_inicio_vigencia: data.fecha_inicio_vigencia,
+        origen: data.origen || elementoActual.ORIGEN || "Nueva versión",
+        nuevo_id: {
+          type: oracledb.NUMBER,
+          dir: oracledb.BIND_OUT,
+        },
+      }
+    );
+
+    await connection.commit();
+
+    return result.outBinds.nuevo_id[0];
+  } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
+    throw error;
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+}
+
+async function deleteElementoNormativo(id) {
+  let connection;
+
+  try {
+    connection = await getConnection();
+
+    const hijos = await connection.execute(
+      `
+      SELECT COUNT(*) AS TOTAL
+      FROM ELEMENTO_NORMATIVO
+      WHERE ID_PADRE = :id
+      `,
+      { id: Number(id) },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (hijos.rows[0].TOTAL > 0) {
+      const error = new Error(
+        "No se puede eliminar este elemento porque tiene elementos hijos asociados."
+      );
+      error.code = "TIENE_HIJOS";
+      throw error;
+    }
+
+    const result = await connection.execute(
+      `
+      DELETE FROM ELEMENTO_NORMATIVO
+      WHERE ID_ELEMENTO = :id
+      `,
+      { id: Number(id) },
+      {
+        autoCommit: true,
+      }
+    );
+
+    return result.rowsAffected;
+  } finally {
+    if (connection) {
+      await connection.close();
+    }
+  }
+}
+
+module.exports = {
+  getElementosNormativos,
+  getElementoNormativoById,
+  createElementoNormativo,
+  updateElementoNormativo,
+  publicarNuevaVersion,
+  deleteElementoNormativo,
+};
