@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../controllers/firebase";
+import { getRoleByEmail } from "../utils/permissions";
 
 function Login() {
   const navigate = useNavigate();
@@ -24,13 +25,24 @@ function Login() {
       );
 
       const token = await credencial.user.getIdToken();
+      const email = credencial.user.email;
+      const rol = getRoleByEmail(email);
 
       localStorage.setItem("firebaseToken", token);
-      localStorage.setItem("userEmail", credencial.user.email);
+      localStorage.setItem("userEmail", email);
+      localStorage.setItem("userRole", rol);
+
+      if (email === "admin@tec.ac.cr") {
+        localStorage.setItem("id_usuario", "3");
+      } else if (email === "secretaria@tec.ac.cr") {
+        localStorage.setItem("id_usuario", "22");
+      } else if (email === "asambleista@tec.ac.cr") {
+        localStorage.setItem("id_usuario", "41");
+      }
 
       navigate("/dashboard");
     } catch (err) {
-        console.log("Error Firebase:", err.code, err.message);
+      console.log("Error Firebase:", err.code, err.message);
       setError("Correo o contraseña incorrectos.");
     } finally {
       setCargando(false);
@@ -67,13 +79,7 @@ function Login() {
           value={correo}
           onChange={(e) => setCorreo(e.target.value)}
           required
-          style={{
-            width: "100%",
-            padding: "10px",
-            marginTop: "20px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-          }}
+          style={inputStyle}
         />
 
         <input
@@ -82,13 +88,7 @@ function Login() {
           value={contrasena}
           onChange={(e) => setContrasena(e.target.value)}
           required
-          style={{
-            width: "100%",
-            padding: "10px",
-            marginTop: "15px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-          }}
+          style={inputStyle}
         />
 
         {error && (
@@ -118,5 +118,13 @@ function Login() {
     </div>
   );
 }
+
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginTop: "15px",
+  borderRadius: "8px",
+  border: "1px solid #ccc",
+};
 
 export default Login;

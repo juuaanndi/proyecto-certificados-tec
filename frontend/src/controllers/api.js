@@ -1,17 +1,37 @@
 import axios from "axios";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
 
 const api = axios.create({
   baseURL: "http://localhost:3000/api",
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("firebaseToken");
+const esperarUsuarioFirebase = () => {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+};
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+api.interceptors.request.use(
+  async (config) => {
+    let user = auth.currentUser;
 
-  return config;
-});
+    if (!user) {
+      user = await esperarUsuarioFirebase();
+    }
+
+    if (user) {
+      const token = await user.getIdToken(true);
+      config.headers.Authorization = `Bearer ${token}`;
+      localStorage.setItem("firebaseToken", token);
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 export default api;
