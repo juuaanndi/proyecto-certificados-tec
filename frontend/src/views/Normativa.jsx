@@ -22,19 +22,16 @@ import {
 } from "@mui/material";
 
 import api from "../controllers/api";
+import {
+  canCreate,
+  canEdit,
+  canDelete,
+  isAsambleista,
+} from "../utils/permissions";
 
-const tipos = [
-  "REGLAMENTO",
-  "TITULO",
-  "CAPITULO",
-  "ARTICULO",
-  "INCISO",
-];
+const tipos = ["REGLAMENTO", "TITULO", "CAPITULO", "ARTICULO", "INCISO"];
 
-const estados = [
-  "VIGENTE",
-  "HISTORICA",
-];
+const estados = ["VIGENTE", "HISTORICA"];
 
 const formInicial = {
   id_padre: "",
@@ -74,18 +71,26 @@ function Normativa() {
   }
 
   function abrirCrear() {
+    if (!canCreate()) {
+      setError("No tiene permisos para crear normativa.");
+      return;
+    }
+
     setModoEdicion(false);
     setIdActual(null);
     setForm({
       ...formInicial,
-      fecha_inicio_vigencia: new Date()
-        .toISOString()
-        .split("T")[0],
+      fecha_inicio_vigencia: new Date().toISOString().split("T")[0],
     });
     setOpen(true);
   }
 
   function abrirEditar(elemento) {
+    if (!canEdit()) {
+      setError("No tiene permisos para editar normativa.");
+      return;
+    }
+
     setModoEdicion(true);
     setIdActual(elemento.ID_ELEMENTO);
 
@@ -95,12 +100,9 @@ function Normativa() {
       titulo: elemento.TITULO || "",
       contenido: elemento.CONTENIDO || "",
       orden: elemento.ORDEN || "",
-      estado_vigencia:
-        elemento.ESTADO_VIGENCIA || "VIGENTE",
-      fecha_inicio_vigencia:
-        elemento.FECHA_INICIO_VIGENCIA || "",
-      fecha_fin_vigencia:
-        elemento.FECHA_FIN_VIGENCIA || "",
+      estado_vigencia: elemento.ESTADO_VIGENCIA || "VIGENTE",
+      fecha_inicio_vigencia: elemento.FECHA_INICIO_VIGENCIA || "",
+      fecha_fin_vigencia: elemento.FECHA_FIN_VIGENCIA || "",
       origen: elemento.ORIGEN || "",
     });
 
@@ -122,38 +124,42 @@ function Normativa() {
   }
 
   async function guardarElemento() {
+    if (!canCreate() && !modoEdicion) {
+      setError("No tiene permisos para crear normativa.");
+      return;
+    }
+
+    if (!canEdit() && modoEdicion) {
+      setError("No tiene permisos para editar normativa.");
+      return;
+    }
+
     try {
       setMensaje("");
       setError("");
 
       if (modoEdicion) {
         await api.put(`/normativa/${idActual}`, form);
-
-        setMensaje(
-          "Elemento normativo actualizado correctamente."
-        );
+        setMensaje("Elemento normativo actualizado correctamente.");
       } else {
-        console.log(form);
         await api.post("/normativa", form);
-
-        setMensaje(
-          "Elemento normativo creado correctamente."
-        );
+        setMensaje("Elemento normativo creado correctamente.");
       }
 
       cerrarModal();
       cargarElementos();
     } catch (err) {
       console.error(err);
-
-      setError(
-        err?.response?.data?.error ||
-          "Error guardando normativa."
-      );
+      setError(err?.response?.data?.error || "Error guardando normativa.");
     }
   }
 
   async function eliminarElemento(id) {
+    if (!canDelete()) {
+      setError("No tiene permisos para eliminar normativa.");
+      return;
+    }
+
     const confirmar = window.confirm(
       "¿Desea eliminar este elemento normativo?"
     );
@@ -163,53 +169,41 @@ function Normativa() {
     try {
       await api.delete(`/normativa/${id}`);
 
-      setMensaje(
-        "Elemento normativo eliminado correctamente."
-      );
+      setMensaje("Elemento normativo eliminado correctamente.");
 
       cargarElementos();
     } catch (err) {
       console.error(err);
 
-      setError(
-        err?.response?.data?.error ||
-          "Error eliminando elemento."
-      );
+      setError(err?.response?.data?.error || "Error eliminando elemento.");
     }
   }
 
   async function nuevaVersion(elemento) {
-    const contenido = prompt(
-      "Ingrese el nuevo contenido de la versión:"
-    );
+    if (!canEdit()) {
+      setError("No tiene permisos para publicar nuevas versiones.");
+      return;
+    }
+
+    const contenido = prompt("Ingrese el nuevo contenido de la versión:");
 
     if (!contenido) return;
 
     try {
-      await api.post(
-        `/normativa/${elemento.ID_ELEMENTO}/nueva-version`,
-        {
-          titulo: elemento.TITULO,
-          contenido,
-          fecha_inicio_vigencia: new Date()
-            .toISOString()
-            .split("T")[0],
-          origen: "Nueva versión desde sistema",
-        }
-      );
+      await api.post(`/normativa/${elemento.ID_ELEMENTO}/nueva-version`, {
+        titulo: elemento.TITULO,
+        contenido,
+        fecha_inicio_vigencia: new Date().toISOString().split("T")[0],
+        origen: "Nueva versión desde sistema",
+      });
 
-      setMensaje(
-        "Nueva versión normativa publicada."
-      );
+      setMensaje("Nueva versión normativa publicada.");
 
       cargarElementos();
     } catch (err) {
       console.error(err);
 
-      setError(
-        err?.response?.data?.error ||
-          "Error creando nueva versión."
-      );
+      setError(err?.response?.data?.error || "Error creando nueva versión.");
     }
   }
 
@@ -233,28 +227,22 @@ function Normativa() {
             "linear-gradient(135deg, rgba(25,118,210,0.10), rgba(255,255,255,1))",
         }}
       >
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
             <Typography variant="h3" fontWeight={900}>
               Gestión Normativa
             </Typography>
 
             <Typography color="text.secondary">
-              Administre reglamentos,
-              capítulos, artículos e incisos.
+              Consulte reglamentos, capítulos, artículos e incisos.
             </Typography>
           </Box>
 
-          <Button
-            variant="contained"
-            onClick={abrirCrear}
-          >
-            Nuevo elemento
-          </Button>
+          {canCreate() && (
+            <Button variant="contained" onClick={abrirCrear}>
+              Nuevo elemento
+            </Button>
+          )}
         </Stack>
       </Paper>
 
@@ -288,61 +276,61 @@ function Normativa() {
               <TableRow key={e.ID_ELEMENTO}>
                 <TableCell>{e.TIPO}</TableCell>
 
-                <TableCell>
-                  {e.TITULO || "Sin título"}
-                </TableCell>
+                <TableCell>{e.TITULO || "Sin título"}</TableCell>
 
                 <TableCell>
                   <Chip
                     label={e.ESTADO_VIGENCIA}
                     color={
-                      e.ESTADO_VIGENCIA === "VIGENTE"
-                        ? "success"
-                        : "default"
+                      e.ESTADO_VIGENCIA === "VIGENTE" ? "success" : "default"
                     }
                   />
                 </TableCell>
 
-                <TableCell>
-                  {e.ID_PADRE || "-"}
-                </TableCell>
+                <TableCell>{e.ID_PADRE || "-"}</TableCell>
+
+                <TableCell>{e.ORDEN || "-"}</TableCell>
 
                 <TableCell>
-                  {e.ORDEN || "-"}
-                </TableCell>
+                  {isAsambleista() ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Solo lectura
+                    </Typography>
+                  ) : (
+                    <Stack direction="row" spacing={1}>
+                      {canEdit() && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => abrirEditar(e)}
+                        >
+                          Editar
+                        </Button>
+                      )}
 
-                <TableCell>
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => abrirEditar(e)}
-                    >
-                      Editar
-                    </Button>
+                      {canEdit() && (
+                        <Button
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                          onClick={() => nuevaVersion(e)}
+                        >
+                          Nueva versión
+                        </Button>
+                      )}
 
-                    <Button
-                      size="small"
-                      color="warning"
-                      variant="outlined"
-                      onClick={() => nuevaVersion(e)}
-                    >
-                      Nueva versión
-                    </Button>
-
-                    <Button
-                      size="small"
-                      color="error"
-                      variant="outlined"
-                      onClick={() =>
-                        eliminarElemento(
-                          e.ID_ELEMENTO
-                        )
-                      }
-                    >
-                      Eliminar
-                    </Button>
-                  </Stack>
+                      {canDelete() && (
+                        <Button
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          onClick={() => eliminarElemento(e.ID_ELEMENTO)}
+                        >
+                          Eliminar
+                        </Button>
+                      )}
+                    </Stack>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -358,136 +346,125 @@ function Normativa() {
         </Table>
       </Paper>
 
-      <Dialog
-        open={open}
-        onClose={cerrarModal}
-        fullWidth
-        maxWidth="md"
-      >
-        <DialogTitle>
-          {modoEdicion
-            ? "Editar elemento normativo"
-            : "Nuevo elemento normativo"}
-        </DialogTitle>
+      {!isAsambleista() && (
+        <Dialog open={open} onClose={cerrarModal} fullWidth maxWidth="md">
+          <DialogTitle>
+            {modoEdicion
+              ? "Editar elemento normativo"
+              : "Nuevo elemento normativo"}
+          </DialogTitle>
 
-        <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              select
-              label="Tipo"
-              name="tipo"
-              value={form.tipo}
-              onChange={handleChange}
-              fullWidth
-            >
-              {tipos.map((tipo) => (
-                <MenuItem key={tipo} value={tipo}>
-                  {tipo}
-                </MenuItem>
-              ))}
-            </TextField>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField
+                select
+                label="Tipo"
+                name="tipo"
+                value={form.tipo}
+                onChange={handleChange}
+                fullWidth
+              >
+                {tipos.map((tipo) => (
+                  <MenuItem key={tipo} value={tipo}>
+                    {tipo}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-            <TextField
-              label="Título"
-              name="titulo"
-              value={form.titulo}
-              onChange={handleChange}
-              fullWidth
-            />
+              <TextField
+                label="Título"
+                name="titulo"
+                value={form.titulo}
+                onChange={handleChange}
+                fullWidth
+              />
 
-            <TextField
-              label="Contenido"
-              name="contenido"
-              value={form.contenido}
-              onChange={handleChange}
-              multiline
-              minRows={5}
-              fullWidth
-            />
+              <TextField
+                label="Contenido"
+                name="contenido"
+                value={form.contenido}
+                onChange={handleChange}
+                multiline
+                minRows={5}
+                fullWidth
+              />
 
-            <TextField
-              label="ID Padre"
-              name="id_padre"
-              value={form.id_padre}
-              onChange={handleChange}
-              type="number"
-              fullWidth
-            />
+              <TextField
+                label="ID Padre"
+                name="id_padre"
+                value={form.id_padre}
+                onChange={handleChange}
+                type="number"
+                fullWidth
+              />
 
-            <TextField
-              label="Orden"
-              name="orden"
-              value={form.orden}
-              onChange={handleChange}
-              type="number"
-              fullWidth
-            />
+              <TextField
+                label="Orden"
+                name="orden"
+                value={form.orden}
+                onChange={handleChange}
+                type="number"
+                fullWidth
+              />
 
-            <TextField
-              select
-              label="Estado"
-              name="estado_vigencia"
-              value={form.estado_vigencia}
-              onChange={handleChange}
-              fullWidth
-            >
-              {estados.map((estado) => (
-                <MenuItem
-                  key={estado}
-                  value={estado}
-                >
-                  {estado}
-                </MenuItem>
-              ))}
-            </TextField>
+              <TextField
+                select
+                label="Estado"
+                name="estado_vigencia"
+                value={form.estado_vigencia}
+                onChange={handleChange}
+                fullWidth
+              >
+                {estados.map((estado) => (
+                  <MenuItem key={estado} value={estado}>
+                    {estado}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-            <TextField
-              type="date"
-              label="Inicio vigencia"
-              name="fecha_inicio_vigencia"
-              value={form.fecha_inicio_vigencia}
-              onChange={handleChange}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              fullWidth
-            />
+              <TextField
+                type="date"
+                label="Inicio vigencia"
+                name="fecha_inicio_vigencia"
+                value={form.fecha_inicio_vigencia}
+                onChange={handleChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                fullWidth
+              />
 
-            <TextField
-              type="date"
-              label="Fin vigencia"
-              name="fecha_fin_vigencia"
-              value={form.fecha_fin_vigencia}
-              onChange={handleChange}
-              InputLabelProps={{
-                shrink: true,
-              }}
-              fullWidth
-            />
+              <TextField
+                type="date"
+                label="Fin vigencia"
+                name="fecha_fin_vigencia"
+                value={form.fecha_fin_vigencia || ""}
+                onChange={handleChange}
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                fullWidth
+              />
 
-            <TextField
-              label="Origen"
-              name="origen"
-              value={form.origen}
-              onChange={handleChange}
-              fullWidth
-            />
-          </Stack>
-        </DialogContent>
+              <TextField
+                label="Origen"
+                name="origen"
+                value={form.origen}
+                onChange={handleChange}
+                fullWidth
+              />
+            </Stack>
+          </DialogContent>
 
-        <DialogActions>
-          <Button onClick={cerrarModal}>
-            Cancelar
-          </Button>
+          <DialogActions>
+            <Button onClick={cerrarModal}>Cancelar</Button>
 
-          <Button
-            variant="contained"
-            onClick={guardarElemento}
-          >
-            Guardar
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <Button variant="contained" onClick={guardarElemento}>
+              Guardar
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 }

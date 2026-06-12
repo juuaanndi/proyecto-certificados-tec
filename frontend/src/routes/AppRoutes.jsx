@@ -9,6 +9,7 @@ import Propuestas from "../views/Propuestas.jsx";
 import Nombramientos from "../views/Nombramientos.jsx";
 import Asistencias from "../views/Asistencias.jsx";
 import Normativa from "../views/Normativa.jsx";
+import ProtectedRoute from "../components/ProtectedRoute.jsx";
 
 function AppRoutes() {
   return (
@@ -16,38 +17,79 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<Login />} />
 
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute roles={["ADMINISTRADOR", "SECRETARIA"]}>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/sesiones"
-            element={<Sesiones />}
-          />
-
-          <Route
-            path="/certificaciones"
-            element={<Certificaciones />}
-          />
-
-          <Route
-            path="/propuestas"
-            element={<Propuestas />}
-          />
-
-          <Route
-            path="/nombramientos"
-            element={<Nombramientos />}
+            element={
+              <ProtectedRoute roles={["ADMINISTRADOR", "SECRETARIA"]}>
+                <Sesiones />
+              </ProtectedRoute>
+            }
           />
 
           <Route
             path="/asistencias"
-            element={<Asistencias />}
+            element={
+              <ProtectedRoute roles={["ADMINISTRADOR", "SECRETARIA"]}>
+                <Asistencias />
+              </ProtectedRoute>
+            }
           />
 
           <Route
             path="/normativa"
-            element={<Normativa />}
-        />
+            element={
+              <ProtectedRoute
+                roles={["ADMINISTRADOR", "SECRETARIA", "ASAMBLEISTA"]}
+              >
+                <Normativa />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/certificaciones"
+            element={
+              <ProtectedRoute
+                roles={["ADMINISTRADOR", "SECRETARIA", "ASAMBLEISTA"]}
+              >
+                <Certificaciones />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/propuestas"
+            element={
+              <ProtectedRoute roles={["ADMINISTRADOR", "SECRETARIA"]}>
+                <Propuestas />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/nombramientos"
+            element={
+              <ProtectedRoute roles={["ADMINISTRADOR", "SECRETARIA"]}>
+                <Nombramientos />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -30,6 +30,15 @@ import EditIcon from "@mui/icons-material/Edit";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 
 import api from "../controllers/api";
+import {
+  canAnular,
+  canCreate,
+  canDelete,
+  canEdit,
+  canGeneratePdf,
+  getCurrentUser,
+  isAsambleista,
+} from "../utils/permissions";
 
 const formInicial = {
   id_nombramiento: "",
@@ -50,6 +59,8 @@ function normalizarFecha(fecha) {
 }
 
 function Certificaciones() {
+  const user = getCurrentUser();
+
   const [certificaciones, setCertificaciones] = useState([]);
   const [catalogos, setCatalogos] = useState({
     nombramientos: [],
@@ -103,6 +114,11 @@ function Certificaciones() {
   }
 
   function abrirCrear() {
+    if (!canCreate()) {
+      setMensajeError("No tiene permisos para crear certificaciones.");
+      return;
+    }
+
     setMensajeError("");
     setMensajeExito("");
     setModoEdicion(false);
@@ -111,7 +127,7 @@ function Certificaciones() {
     setForm({
       ...formInicial,
       id_nombramiento: catalogos.nombramientos[0]?.ID_NOMBRAMIENTO || "",
-      id_usuario_emisor: catalogos.usuarios[0]?.ID_USUARIO || "",
+      id_usuario_emisor: user.id_usuario || catalogos.usuarios[0]?.ID_USUARIO || "",
       fecha_emision: new Date().toISOString().split("T")[0],
       numero_documento: `CERT-${new Date().getFullYear()}-${String(
         certificaciones.length + 1
@@ -122,6 +138,11 @@ function Certificaciones() {
   }
 
   function abrirEditar(certificacion) {
+    if (!canEdit()) {
+      setMensajeError("No tiene permisos para editar certificaciones.");
+      return;
+    }
+
     setMensajeError("");
     setMensajeExito("");
     setModoEdicion(true);
@@ -165,6 +186,14 @@ function Certificaciones() {
   }
 
   function validarFormulario() {
+    if (!canCreate() && !modoEdicion) {
+      return "No tiene permisos para crear certificaciones.";
+    }
+
+    if (!canEdit() && modoEdicion) {
+      return "No tiene permisos para editar certificaciones.";
+    }
+
     if (!modoEdicion) {
       if (!form.id_nombramiento) return "Debe seleccionar un nombramiento.";
       if (!form.id_usuario_emisor) return "Debe seleccionar un usuario emisor.";
@@ -174,6 +203,10 @@ function Certificaciones() {
     }
 
     if (!form.estado) return "Debe seleccionar un estado.";
+
+    if (form.estado === "ANULADA" && !canAnular()) {
+      return "No tiene permisos para anular certificaciones.";
+    }
 
     if (form.estado === "ANULADA" && !form.descripcion_motivo_anulado.trim()) {
       return "Debe indicar el motivo de anulación.";
@@ -232,6 +265,11 @@ function Certificaciones() {
   }
 
   async function eliminarCertificacion(id) {
+    if (!canDelete()) {
+      setMensajeError("No tiene permisos para eliminar certificaciones.");
+      return;
+    }
+
     const confirmar = window.confirm(
       "¿Seguro que desea eliminar esta certificación?"
     );
@@ -253,11 +291,66 @@ function Certificaciones() {
     }
   }
 
+  function puedeVerPdf(certificacion) {
+    if (!canGeneratePdf()) return false;
+
+    if (!isAsambleista()) return true;
+
+    const correoUsuario = user.email?.toLowerCase();
+    const correoCertificacion =
+      certificacion.CORREO_ASAMBLEISTA?.toLowerCase?.() ||
+      certificacion.EMAIL_ASAMBLEISTA?.toLowerCase?.() ||
+      "";
+
+    if (!correoCertificacion) return true;
+
+    return correoUsuario === correoCertificacion;
+  }
+
+  function generarPdf(certificacion) {
+    if (!certificacion?.ID_CERTIFICACION) {
+      setMensajeError("No fue posible generar el PDF.");
+      return;
+    }
+
+    if (!puedeVerPdf(certificacion)) {
+      setMensajeError("No tiene permisos para generar este PDF.");
+      return;
+    }
+
+    try {
+      window.open(
+        `http://localhost:3000/api/pdf/certificado/${certificacion.ID_CERTIFICACION}`,
+        "_blank"
+      );
+
+      setMensajeExito("PDF generado correctamente.");
+    } catch (error) {
+      console.error(error);
+      setMensajeError("No fue posible generar el PDF.");
+    }
+  }
+
   const certificacionesOrdenadas = useMemo(() => {
-    return [...certificaciones].sort(
+    const lista = [...certificaciones].sort(
       (a, b) => Number(b.ID_CERTIFICACION) - Number(a.ID_CERTIFICACION)
     );
-  }, [certificaciones]);
+
+    if (!isAsambleista()) return lista;
+
+    const correoUsuario = user.email?.toLowerCase();
+
+    return lista.filter((c) => {
+      const correoCertificacion =
+        c.CORREO_ASAMBLEISTA?.toLowerCase?.() ||
+        c.EMAIL_ASAMBLEISTA?.toLowerCase?.() ||
+        "";
+
+      if (!correoCertificacion) return true;
+
+      return correoUsuario === correoCertificacion;
+    });
+  }, [certificaciones, user.email]);
 
   return (
     <Box
@@ -296,19 +389,21 @@ function Certificaciones() {
             </Typography>
           </Box>
 
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={abrirCrear}
-            sx={{
-              height: 46,
-              px: 3,
-              borderRadius: 2,
-              fontWeight: 700,
-            }}
-          >
-            Nueva certificación
-          </Button>
+          {canCreate() && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={abrirCrear}
+              sx={{
+                height: 46,
+                px: 3,
+                borderRadius: 2,
+                fontWeight: 700,
+              }}
+            >
+              Nueva certificación
+            </Button>
+          )}
         </Stack>
       </Paper>
 
@@ -321,6 +416,12 @@ function Certificaciones() {
       {mensajeExito && (
         <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
           {mensajeExito}
+        </Alert>
+      )}
+
+      {isAsambleista() && (
+        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+          Vista de solo lectura. Puede consultar normativa y descargar sus certificaciones permitidas.
         </Alert>
       )}
 
@@ -338,7 +439,7 @@ function Certificaciones() {
           </Typography>
 
           <Typography color="text.secondary">
-            Total: {certificaciones.length}
+            Total: {certificacionesOrdenadas.length}
           </Typography>
         </Box>
 
@@ -367,11 +468,11 @@ function Certificaciones() {
                   <TableCell colSpan={8}>
                     <Stack alignItems="center" spacing={1.5} sx={{ py: 7 }}>
                       <Typography fontWeight={700}>
-                        No hay certificaciones registradas
+                        No hay certificaciones disponibles
                       </Typography>
 
                       <Typography variant="body2" color="text.secondary">
-                        Cree la primera certificación para comenzar.
+                        No existen certificaciones para mostrar según su rol.
                       </Typography>
                     </Stack>
                   </TableCell>
@@ -409,41 +510,42 @@ function Certificaciones() {
                         spacing={1}
                         justifyContent="flex-end"
                       >
-                        <Tooltip title="Editar / anular">
-                          <IconButton
-                            color="primary"
-                            onClick={() => abrirEditar(certificacion)}
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
+                        {canEdit() && (
+                          <Tooltip title="Editar / anular">
+                            <IconButton
+                              color="primary"
+                              onClick={() => abrirEditar(certificacion)}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
 
-                        <Tooltip title="Descargar PDF">
-                          <IconButton
-                            color="secondary"
-                            onClick={() =>
-                              window.open(
-                                `http://localhost:3000/api/pdf/certificado/${certificacion.ID_CERTIFICACION}`,
-                                "_blank"
-                              )
-                            }
-                          >
-                            <PictureAsPdfIcon />
-                          </IconButton>
-                        </Tooltip>
+                        {puedeVerPdf(certificacion) && (
+                          <Tooltip title="Descargar PDF">
+                            <IconButton
+                              color="secondary"
+                              onClick={() => generarPdf(certificacion)}
+                            >
+                              <PictureAsPdfIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
 
-                        <Tooltip title="Eliminar certificación">
-                          <IconButton
-                            color="error"
-                            onClick={() =>
-                              eliminarCertificacion(
-                                certificacion.ID_CERTIFICACION
-                              )
-                            }
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
+                        {canDelete() && (
+                          <Tooltip title="Eliminar certificación">
+                            <IconButton
+                              color="error"
+                              onClick={() =>
+                                eliminarCertificacion(
+                                  certificacion.ID_CERTIFICACION
+                                )
+                              }
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -522,6 +624,7 @@ function Certificaciones() {
               value={form.estado}
               onChange={handleChange}
               fullWidth
+              disabled={!canAnular()}
             >
               {catalogos.estados.map((estado) => (
                 <MenuItem key={estado} value={estado}>
@@ -530,16 +633,18 @@ function Certificaciones() {
               ))}
             </TextField>
 
-            <TextField
-              label="Motivo de anulación"
-              name="descripcion_motivo_anulado"
-              value={form.descripcion_motivo_anulado}
-              onChange={handleChange}
-              fullWidth
-              multiline
-              minRows={3}
-              helperText="Indique el motivo si la certificación está anulada."
-            />
+            {form.estado === "ANULADA" && (
+              <TextField
+                label="Motivo de anulación"
+                name="descripcion_motivo_anulado"
+                value={form.descripcion_motivo_anulado}
+                onChange={handleChange}
+                fullWidth
+                multiline
+                minRows={3}
+                helperText="Indique el motivo si la certificación está anulada."
+              />
+            )}
           </Stack>
         </DialogContent>
 
